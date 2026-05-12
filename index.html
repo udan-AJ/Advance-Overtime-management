@@ -1,294 +1,521 @@
-<!DOCTYPE html>
-<html lang="si">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced OT Tracker | CIC Livestock Solutions</title>
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-    <script type="module">
-
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-
-        import {
-            getAuth,
-            onAuthStateChanged,
-            signOut,
-            signInWithEmailAndPassword,
-            createUserWithEmailAndPassword
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-        import {
-            getFirestore,
-            doc,
-            setDoc,
-            getDoc,
-            collection,
-            query,
-            getDocs,
-            deleteDoc
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBT3joJWX-dsz4C9-wKsffepSpXypn1n9E",
-            authDomain: "time-management-28962.firebaseapp.com",
-            projectId: "time-management-28962",
-            storageBucket: "time-management-28962.firebasestorage.app",
-            messagingSenderId: "813174935711",
-            appId: "1:813174935711:web:066f4442e08e600cf512aa"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
+<!DOCTYPE html>    
+<html lang="si">    
+<head>    
+    <meta charset="UTF-8">    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    
+    <title>Advanced OT Tracker | CIC Livestock Solutions</title>    
+    <script src="https://cdn.tailwindcss.com"></script>    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>    
+        
+    <script type="module">    
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";    
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";    
+        import { getFirestore, doc, setDoc, getDoc, collection, query, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";    
+    
+        const firebaseConfig = {    
+            apiKey: "AIzaSyBT3joJWX-dsz4C9-wKsffepSpXypn1n9E",    
+            authDomain: "time-management-28962.firebaseapp.com",    
+            projectId: "time-management-28962",    
+            storageBucket: "time-management-28962.firebasestorage.app",    
+            messagingSenderId: "813174935711",    
+            appId: "1:813174935711:web:066f4442e08e600cf512aa"    
+        };    
+    
+        const app = initializeApp(firebaseConfig);    
+        const auth = getAuth(app);    
+        const db = getFirestore(app);    
+    
         let userHolidays = [];
         let userLeaves = {};
-        let currentCalcData = {};
+        let currentCalcData = {}; 
         let isSignUpMode = false;
-
-        onAuthStateChanged(auth, async (user) => {
-
-            if (user) {
-
-                document.getElementById('authScreen').classList.add('hidden');
-                document.getElementById('appScreen').classList.remove('hidden');
-
+    
+        onAuthStateChanged(auth, async (user) => {    
+            if (user) {    
+                document.getElementById('authScreen').classList.add('hidden');    
+                document.getElementById('appScreen').classList.remove('hidden');    
                 await loadHolidays();
                 await loadLeaves();
-
-                renderSheet();
-
-            } else {
-
-                document.getElementById('authScreen').classList.remove('hidden');
-                document.getElementById('appScreen').classList.add('hidden');
-            }
-        });
+                renderSheet();    
+            } else {    
+                document.getElementById('authScreen').classList.remove('hidden');    
+                document.getElementById('appScreen').classList.add('hidden');    
+            }    
+        });    
 
         async function loadLeaves() {
-
             const user = auth.currentUser;
-
-            if (!user) return;
-
-            const monthId =
-                `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value)+1}`;
-
-            const docSnap =
-                await getDoc(doc(db, "users", user.uid, "leaves", monthId));
-
+            if(!user) return;
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            const docSnap = await getDoc(doc(db, "users", user.uid, "leaves", monthId));
             userLeaves = docSnap.exists() ? docSnap.data() : {};
-
             renderLeaveList();
         }
 
-        async function loadHolidays() {
-
+        async function loadHolidays() {    
             const user = auth.currentUser;
-
-            if (!user) return;
-
-            const q = query(collection(db, "users", user.uid, "holidays"));
-
-            const querySnapshot = await getDocs(q);
-
-            userHolidays = [];
-
-            querySnapshot.forEach((doc) => userHolidays.push(doc.id));
-
+            if(!user) return;
+            const q = query(collection(db, "users", user.uid, "holidays"));    
+            const querySnapshot = await getDocs(q);    
+            userHolidays = [];    
+            querySnapshot.forEach((doc) => userHolidays.push(doc.id));    
             renderHolidayList();
         }
 
-        window.addHoliday = async () => {
-
-            const date = document.getElementById('holidayInput').value;
-
-            if (!date) return;
-
-            await setDoc(
-                doc(db, "users", auth.currentUser.uid, "holidays", date),
-                { active: true }
-            );
-
-            await loadHolidays();
-
-            renderSheet();
+        window.addHoliday = async () => {    
+            const date = document.getElementById('holidayInput').value;    
+            if (!date) return;    
+            await setDoc(doc(db, "users", auth.currentUser.uid, "holidays", date), { active: true });    
+            await loadHolidays();    
+            renderSheet();    
+        };    
+    
+        window.removeHoliday = async (date) => {    
+            await deleteDoc(doc(db, "users", auth.currentUser.uid, "holidays", date));    
+            await loadHolidays();    
+            renderSheet();    
         };
 
-        window.removeHoliday = async (date) => {
-
-            await deleteDoc(
-                doc(db, "users", auth.currentUser.uid, "holidays", date)
-            );
-
-            await loadHolidays();
-
-            renderSheet();
-        };
-
-        function renderHolidayList() {
-
+        function renderHolidayList() {    
             const list = document.getElementById('holidayList');
+            if(!list) return;
+            list.innerHTML = userHolidays.map(date => `    
+                <div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100 shadow-sm">    
+                    <span class="font-bold text-slate-700 text-xs">${date}</span>    
+                    <button onclick="removeHoliday('${date}')" class="text-red-500 text-[10px] font-black uppercase">Remove</button>    
+                </div>    
+            `).join('') || `<p class="text-slate-400 text-[10px] text-center py-4">No Holidays Added</p>`;    
+        }
 
-            if (!list) return;
+        window.saveLeave = async () => {
+            const dateInput = document.getElementById('leaveDate').value;
+            const type = document.getElementById('leaveType').value;
+            const slot = document.getElementById('leaveSlot').value;
+            if(!dateInput) return alert("Select Date");
+            const dateObj = new Date(dateInput);
+            const day = dateObj.getDate();
+            const monthId = `${dateObj.getFullYear()}-${dateObj.getMonth() + 1}`;
+            userLeaves[day] = { type, slot };
+            await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", monthId), userLeaves, { merge: true });
+            alert("Leave Saved!");
+            renderSheet();
+            renderLeaveList();
+        };
 
-            list.innerHTML = userHolidays.map(date => `
-                <div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100 shadow-sm">
-                    <span class="font-bold text-slate-700 text-xs">${date}</span>
-                    <button onclick="removeHoliday('${date}')" class="text-red-500 text-[10px] font-black uppercase">
-                        Remove
-                    </button>
+        window.deleteLeave = async (day) => {
+            delete userLeaves[day];
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", monthId), userLeaves);
+            renderSheet();
+            renderLeaveList();
+        };
+
+        function renderLeaveList() {
+            const list = document.getElementById('leaveList');
+            if(!list) return;
+            list.innerHTML = Object.entries(userLeaves).map(([day, data]) => `
+                <div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100">
+                    <div class="text-[10px] font-bold text-slate-600">Day ${day} - ${data.type} (${data.slot})</div>
+                    <button onclick="deleteLeave('${day}')" class="text-red-500 text-[10px] font-black uppercase">Delete</button>
                 </div>
-            `).join('');
+            `).join('') || `<p class="text-slate-400 text-[10px] text-center py-4">No leaves recorded.</p>`;
         }
 
-        function cleanTime(val) {
-
-            if (!val) return "00:00";
-
-            // FIXED EXCEL TIME IMPORT
-            if (typeof val === "number") {
-
-                const totalMinutes = Math.round(val * 24 * 60);
-
-                const hours =
-                    Math.floor(totalMinutes / 60) % 24;
-
-                const minutes =
-                    totalMinutes % 60;
-
-                return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
+        function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isLastDay) {
+            let [h1, m1] = inTime.split(':').map(Number);
+            let [h2, m2] = outTime.split(':').map(Number);
+            const hasData = (inTime && outTime && inTime !== "00:00" && outTime !== "00:00");
+            let totalMinutes = hasData ? ((h2 * 60 + m2) - (h1 * 60 + m1)) : 0;
+            if (hasData && isNextDay) totalMinutes += 1440;
+            let shortLeaveBonusMinutes = 0;
+            if (hasData && leaveData && leaveData.type === "Short Leave") {
+                if (leaveData.slot === "Morning") {
+                    let arrivalMin = h1 * 60 + m1;
+                    shortLeaveBonusMinutes = Math.min(90, Math.max(0, arrivalMin - (8 * 60 + 30)));
+                } else if (leaveData.slot === "Evening") {
+                    let exitMin = h2 * 60 + m2;
+                    shortLeaveBonusMinutes = Math.min(90, Math.max(0, (17 * 60) - exitMin));
+                }
             }
-
-            let str = String(val).trim();
-
-            let m = str.match(/(\d{1,2}):(\d{1,2})/);
-
-            if (m) {
-
-                return `${m[1].padStart(2,'0')}:${m[2].padStart(2,'0')}`;
+            let finalMinutes = totalMinutes + shortLeaveBonusMinutes;
+            let hWork = Math.floor(finalMinutes / 60);
+            let mWork = finalMinutes % 60;
+            let roundedWorked = hasData ? (hWork + (mWork >= 25 && mWork <= 54 ? 0.5 : (mWork >= 55 ? 1.0 : 0))) : 0;
+            let isFullDay = roundedWorked >= 15; 
+            let req = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
+            if (leaveData) {
+                if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") {
+                    req = isFullDay ? 9 : 0; 
+                } else if (leaveData.type === "Half Day") {
+                    req = Math.max(0, req - 4.5);
+                }
+            } else if (isFullDay && req > 0) {
+                req = isLastDay ? 9 : 18; 
             }
-
-            return "00:00";
+            let ot = (dayOfWeek === 0 || isHoliday) ? 0 : Math.max(0, roundedWorked - req);
+            let sOT = (dayOfWeek === 0 || isHoliday) ? roundedWorked : 0;
+            if (roundedWorked === 0) { ot = 0; sOT = 0; }
+            return { worked: roundedWorked, req, ot, sOT, lieu: (dayOfWeek === 0 || isHoliday) && roundedWorked >= 9, isFullDay };
         }
 
-        // FIXED IMPORT FUNCTION
+        async function renderSheet() {    
+            const user = auth.currentUser;    
+            if(!user) return;
+            const month = parseInt(document.getElementById('monthSelect').value);    
+            const year = parseInt(document.getElementById('yearSelect').value);    
+            const container = document.getElementById('sheetContainer');    
+            const daysInMonth = new Date(year, month + 1, 0).getDate();    
+            const monthId = `${year}-${month + 1}`;    
+            
+            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-xs font-bold'>LOADING...</div>";    
+            const docSnap = await getDoc(doc(db, "users", user.uid, "months", monthId));    
+            const savedData = docSnap.exists() ? docSnap.data() : {};    
+
+            container.innerHTML = "";    
+            let tWorkedTotal = 0, tSOTTotal = 0, tLieuCount = 0, deductionDays = 0, lastDayWasFullShift = false;
+            
+            let weekendCount = 0, holidayCount = 0, fullLeaveCount = 0, halfDayCount = 0;
+
+            for (let d = 1; d <= daysInMonth; d++) {    
+                const dateObj = new Date(year, month, d);
+                const isHoliday = userHolidays.includes(dateObj.toLocaleDateString('en-CA'));    
+                const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };    
+                const leaveData = userLeaves[d];
+                const dayOfWeek = dateObj.getDay();
+
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                lastDayWasFullShift = res.isFullDay;
+                
+                tWorkedTotal += (dayOfWeek === 0 || isHoliday) ? 0 : res.worked;
+                tSOTTotal += res.sOT; 
+                if(res.lieu) tLieuCount++; 
+
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    deductionDays += 1;
+                    weekendCount++;
+                } else if (isHoliday) {
+                    deductionDays += 1;
+                    holidayCount++;
+                } else if (leaveData) {
+                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") {
+                        deductionDays += 1;
+                        fullLeaveCount++;
+                    } else if (leaveData.type === "Half Day") {
+                        deductionDays += 0.5;
+                        halfDayCount++;
+                    }
+                }
+    
+                const row = document.createElement('div');    
+                row.className = `flex items-center gap-1 p-3 border-b ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;    
+                row.innerHTML = `    
+                    <div class="w-8 text-center">    
+                        <span class="block text-[7px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
+                        <span class="text-base font-black text-slate-700 leading-none">${d}</span>    
+                    </div>    
+                    <div class="flex-1 grid grid-cols-2 gap-1 opacity-80">    
+                        <input type="time" value="${dayData.in === "00:00" ? "" : dayData.in}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
+                        <input type="time" value="${dayData.out === "00:00" ? "" : dayData.out}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
+                    </div>
+                    <div class="w-20 text-center text-[8px] font-bold border-x px-1 leading-tight">
+                        <p class="text-blue-600 truncate uppercase">${leaveData ? leaveData.type : '-'}</p>
+                        <div class="flex justify-between mt-1"><span class="text-slate-400">W:${res.worked || '-'}</span><span class="text-red-500">R:${res.req}</span></div>
+                    </div>    
+                    <div class="w-12 text-right">    
+                        <div class="text-[8px] font-black text-blue-600">${res.ot || ''}</div>
+                        <div class="text-[8px] font-black text-red-600">${res.sOT || ''}</div>
+                    </div>    
+                `;    
+                container.appendChild(row);    
+            }    
+
+            const tShouldWork = (daysInMonth - deductionDays) * 9;
+            currentCalcData = { daysInMonth, deductionDays, weekendCount, holidayCount, fullLeaveCount, halfDayCount, tShouldWork };
+
+            document.getElementById('totalHrs').innerHTML = `
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <span>Worked: ${tWorkedTotal.toFixed(1)}</span>
+                    <span>Required: ${tShouldWork.toFixed(1)}</span>
+                    <span class="text-yellow-300">Normal OT: ${Math.max(0, tWorkedTotal - tShouldWork).toFixed(1)}</span>
+                    <span class="text-orange-300">Special OT: ${tSOTTotal.toFixed(1)}</span>
+                </div>
+                <div class="mt-3 pt-2 border-t border-white/20 flex justify-between items-center">
+                    <span class="text-[8px]">Lieu Days: ${tLieuCount}</span>
+                    <button onclick="showCalculationInfo()" class="bg-white/20 px-2 py-1 rounded text-[7px] font-bold uppercase tracking-wider">Show Calculation Info</button>
+                </div>
+            `;    
+        }
+
+        window.showCalculationInfo = () => {
+            const { daysInMonth, deductionDays, weekendCount, holidayCount, fullLeaveCount, halfDayCount, tShouldWork } = currentCalcData;
+            const info = `
+                <div class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-sm" id="infoModal">
+                    <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <h2 class="text-lg font-black text-blue-600 mb-6 uppercase tracking-tight">Calculation Breakdown</h2>
+                        
+                        <div class="space-y-4 text-xs font-bold text-slate-600">
+                            <div class="flex justify-between border-b pb-2"><span>Total Days in Month</span><span class="text-slate-900">${daysInMonth}</span></div>
+                            
+                            <div class="bg-slate-50 p-4 rounded-2xl space-y-2">
+                                <p class="text-[9px] uppercase text-slate-400 mb-2">Total Deductions (-)</p>
+                                <div class="flex justify-between"><span>Weekends (Sat/Sun)</span><span>${weekendCount}</span></div>
+                                <div class="flex justify-between"><span>Holidays (Poya/Public)</span><span>${holidayCount}</span></div>
+                                <div class="flex justify-between"><span>Full Leaves/Lieu</span><span>${fullLeaveCount}</span></div>
+                                <div class="flex justify-between"><span>Half Day (0.5 each)</span><span>${halfDayCount * 0.5}</span></div>
+                                <div class="flex justify-between border-t pt-2 text-red-500"><span>Total Deducted Days</span><span>${deductionDays}</span></div>
+                            </div>
+
+                            <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                <p class="text-[9px] uppercase text-blue-400 mb-1">Final Required Hours</p>
+                                <p class="text-[10px] text-blue-800 italic mb-2">Formula: (Total Days - Deductions) x 9</p>
+                                <div class="text-base text-blue-600">(${daysInMonth} - ${deductionDays}) x 9 = <span class="font-black underline">${tShouldWork.toFixed(1)} Hrs</span></div>
+                            </div>
+                        </div>
+
+                        <button onclick="document.getElementById('infoModal').remove()" class="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Close Info</button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', info);
+        };
+
+        window.switchTab = (tab) => {
+            ['sheetView', 'holidayView', 'leaveView'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.getElementById(tab + 'View').classList.remove('hidden');
+        };
+
         window.importExcel = () => {
-
             const fileInput = document.createElement('input');
-
             fileInput.type = 'file';
-
             fileInput.onchange = async (e) => {
-
                 const reader = new FileReader();
-
                 reader.onload = async (event) => {
-
-                    const workbook = XLSX.read(
-                        new Uint8Array(event.target.result),
-                        { type: 'array' }
-                    );
-
-                    const jsonData = XLSX.utils.sheet_to_json(
-                        workbook.Sheets[workbook.SheetNames[0]],
-                        {
-                            range: 11,
-                            defval: ""
-                        }
-                    );
-
-                    const monthId =
-                        `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value)+1}`;
-
+                    const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { range: 11, defval: "" });
+                    const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
                     let currentData = {};
-
                     jsonData.forEach(row => {
-
-                        let dK = Object.keys(row).find(k => k.trim() === "Date");
-
-                        let iK = Object.keys(row).find(k => k.trim() === "Check In");
-
-                        let oK = Object.keys(row).find(k => k.trim() === "Check Out");
-
-                        let odK = Object.keys(row).find(k => k.trim() === "Out Date");
-
-                        if (!dK || !row[dK]) return;
-
-                        let rawDate = row[dK];
-
-                        let day = null;
-
-                        // FIXED EXCEL DATE FORMAT
-                        if (typeof rawDate === "number") {
-
-                            const excelDate =
-                                XLSX.SSF.parse_date_code(rawDate);
-
-                            if (excelDate) {
-                                day = excelDate.d;
-                            }
-
-                        } else {
-
-                            const dateObj = new Date(rawDate);
-
-                            if (!isNaN(dateObj)) {
-                                day = dateObj.getDate();
-                            }
+                        let dK = Object.keys(row).find(k => k.trim() === "Date"), iK = Object.keys(row).find(k => k.trim() === "Check In"), oK = Object.keys(row).find(k => k.trim() === "Check Out"), odK = Object.keys(row).find(k => k.trim() === "Out Date");
+                        if(row[dK]) {
+                            let ds = String(row[dK]).trim(), p = ds.split(/[-/ ]/), day = p.length >= 3 ? (p[0].length === 4 ? parseInt(p[2]) : parseInt(p[0])) : parseInt(ds);
+                            if(day) currentData[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && row[odK].trim() !== ds) };
                         }
-
-                        if (!day) return;
-
-                        currentData[String(day)] = {
-
-                            in: cleanTime(row[iK]),
-
-                            out: cleanTime(row[oK]),
-
-                            isNextDay: row[odK]
-                                ? new Date(row[odK]).getDate() !== day
-                                : false
-                        };
                     });
-
-                    await setDoc(
-                        doc(
-                            db,
-                            "users",
-                            auth.currentUser.uid,
-                            "months",
-                            monthId
-                        ),
-                        currentData,
-                        { merge: true }
-                    );
-
-                    alert("Import Success!");
-
-                    renderSheet();
+                    await setDoc(doc(db, "users", auth.currentUser.uid, "months", monthId), currentData, { merge: true });
+                    alert("Import Success!"); renderSheet();
                 };
-
                 reader.readAsArrayBuffer(e.target.files[0]);
             };
-
             fileInput.click();
         };
 
-        // KEEP ALL YOUR OTHER ORIGINAL FUNCTIONS HERE EXACTLY SAME
+        function cleanTime(val) {
+            if (!val || val === "00:00") return "00:00";
+            let m = String(val).match(/(\d{1,2}):(\d{1,2})/);
+            return m ? `${m[1].padStart(2,'0')}:${m[2].padStart(2,'0')}` : "00:00";
+        }
 
-    </script>
-</head>
+        // Authentication Functions
+        window.handleLogin = async () => {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('pass').value;
+                
+                if(!email || !password) {
+                    alert("Please fill in all fields");
+                    return;
+                }
+                
+                await signInWithEmailAndPassword(auth, email, password);
+                document.getElementById('email').value = '';
+                document.getElementById('pass').value = '';
+            } catch (error) {
+                alert("Login Error: " + error.message);
+            }
+        };
 
-<body class="bg-slate-50 min-h-screen">
+        window.handleSignUp = async () => {
+            try {
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPass').value;
+                const confirmPassword = document.getElementById('signupConfirmPass').value;
+                
+                if(!email || !password || !confirmPassword) {
+                    alert("Please fill in all fields");
+                    return;
+                }
+                
+                if(password !== confirmPassword) {
+                    alert("Passwords do not match");
+                    return;
+                }
+                
+                if(password.length < 6) {
+                    alert("Password must be at least 6 characters");
+                    return;
+                }
+                
+                await createUserWithEmailAndPassword(auth, email, password);
+                alert("Account created successfully!");
+                toggleAuthMode();
+                document.getElementById('signupEmail').value = '';
+                document.getElementById('signupPass').value = '';
+                document.getElementById('signupConfirmPass').value = '';
+            } catch (error) {
+                alert("Sign Up Error: " + error.message);
+            }
+        };
 
-    <div class="p-10 text-center text-slate-500 font-bold">
-        Your original UI/body code remains EXACTLY SAME.
-        Only Excel import + cleanTime fixed.
+        window.toggleAuthMode = () => {
+            isSignUpMode = !isSignUpMode;
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            const toggleText = document.getElementById('toggleAuthText');
+            const toggleBtn = document.getElementById('toggleAuthBtn');
+            
+            if(isSignUpMode) {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                toggleText.innerHTML = 'Already have an account? ';
+                toggleBtn.textContent = 'Login';
+            } else {
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                toggleText.innerHTML = "Don't have an account? ";
+                toggleBtn.textContent = 'Sign Up';
+            }
+        };
+
+        window.logout = () => signOut(auth);
+        window.renderSheet = renderSheet;
+        window.loadLeaves = loadLeaves;
+        window.clearMonthData = async () => {
+            if(!confirm("Are you sure?")) return;
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            await deleteDoc(doc(db, "users", auth.currentUser.uid, "months", monthId));
+            renderSheet();
+        };
+
+    </script>    
+</head>    
+<body class="bg-slate-50 min-h-screen text-slate-900 pb-12">    
+    <!-- Auth Screen -->
+    <div id="authScreen" class="max-w-md mx-auto pt-24 px-6 text-center">    
+        <div class="bg-white p-10 rounded-[3rem] shadow-2xl border">    
+            <h1 class="text-2xl font-black mb-8 text-blue-600">Secure Cloud OT Tracker</h1>    
+            
+            <!-- Login Form -->
+            <div id="loginForm">
+                <input type="email" id="email" placeholder="Email" class="w-full p-4 mb-3 bg-slate-50 rounded-2xl border outline-none text-sm">    
+                <input type="password" id="pass" placeholder="Password" class="w-full p-4 mb-6 bg-slate-50 rounded-2xl border outline-none text-sm">    
+                <button onclick="handleLogin()" class="w-full p-4 mb-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-sm shadow-lg hover:bg-blue-700 transition">Login</button>
+            </div>
+
+            <!-- Sign Up Form -->
+            <div id="signupForm" class="hidden">
+                <input type="email" id="signupEmail" placeholder="Email" class="w-full p-4 mb-3 bg-slate-50 rounded-2xl border outline-none text-sm">    
+                <input type="password" id="signupPass" placeholder="Password" class="w-full p-4 mb-3 bg-slate-50 rounded-2xl border outline-none text-sm">    
+                <input type="password" id="signupConfirmPass" placeholder="Confirm Password" class="w-full p-4 mb-6 bg-slate-50 rounded-2xl border outline-none text-sm">    
+                <button onclick="handleSignUp()" class="w-full p-4 mb-4 bg-green-600 text-white rounded-2xl font-black uppercase text-sm shadow-lg hover:bg-green-700 transition">Create Account</button>
+            </div>
+
+            <!-- Toggle Auth Mode -->
+            <p class="text-xs text-slate-600">
+                <span id="toggleAuthText">Don't have an account?</span>
+                <button id="toggleAuthBtn" onclick="toggleAuthMode()" class="text-blue-600 font-black underline">Sign Up</button>
+            </p>
+        </div>    
     </div>
 
-</body>
+    <!-- App Screen -->
+    <div id="appScreen" class="hidden max-w-6xl mx-auto px-6 py-8">    
+        <div class="flex justify-between items-center mb-8">    
+            <h1 class="text-3xl font-black text-blue-600">OT Tracker</h1>    
+            <button onclick="logout()" class="px-6 py-3 bg-red-500 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Logout</button>    
+        </div>    
+
+        <div class="bg-white rounded-3xl shadow-xl p-8 mb-8">    
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">    
+                <div>    
+                    <label class="text-xs font-bold text-slate-500 uppercase">Month</label>    
+                    <select id="monthSelect" onchange="loadLeaves(); renderSheet();" class="w-full p-3 mt-2 bg-slate-50 rounded-2xl border font-bold">    
+                        <option value="0">January</option>
+                        <option value="1">February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9">October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                    </select>    
+                </div>    
+                <div>    
+                    <label class="text-xs font-bold text-slate-500 uppercase">Year</label>    
+                    <select id="yearSelect" onchange="loadLeaves(); renderSheet();" class="w-full p-3 mt-2 bg-slate-50 rounded-2xl border font-bold">    
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                    </select>    
+                </div>    
+                <div>    
+                    <label class="text-xs font-bold text-slate-500 uppercase">Action</label>    
+                    <button onclick="importExcel()" class="w-full p-3 mt-2 bg-green-500 text-white rounded-2xl font-black uppercase text-xs">Import Excel</button>    
+                </div>    
+                <div>    
+                    <label class="text-xs font-bold text-slate-500 uppercase">Danger</label>    
+                    <button onclick="clearMonthData()" class="w-full p-3 mt-2 bg-red-500 text-white rounded-2xl font-black uppercase text-xs">Clear Data</button>    
+                </div>    
+            </div>    
+
+            <div class="flex gap-2 mb-8">    
+                <button onclick="switchTab('sheet')" class="px-6 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Sheet</button>    
+                <button onclick="switchTab('holiday')" class="px-6 py-3 bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-xs">Holidays</button>    
+                <button onclick="switchTab('leave')" class="px-6 py-3 bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-xs">Leaves</button>    
+            </div>    
+
+            <!-- Sheet View -->
+            <div id="sheetView" class="bg-slate-50 rounded-2xl overflow-hidden mb-8">    
+                <div id="sheetContainer" class="max-h-[600px] overflow-y-auto"></div>    
+            </div>    
+
+            <!-- Holiday View -->
+            <div id="holidayView" class="hidden">    
+                <div class="flex gap-2 mb-4">    
+                    <input type="date" id="holidayInput" class="flex-1 p-3 bg-slate-50 rounded-2xl border">    
+                    <button onclick="addHoliday()" class="px-6 py-3 bg-red-500 text-white rounded-2xl font-black uppercase text-xs">Add Holiday</button>    
+                </div>    
+                <div id="holidayList"></div>    
+            </div>    
+
+            <!-- Leave View -->
+            <div id="leaveView" class="hidden">    
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">    
+                    <input type="date" id="leaveDate" class="p-3 bg-slate-50 rounded-2xl border">    
+                    <select id="leaveType" class="p-3 bg-slate-50 rounded-2xl border font-bold">
+                        <option value="">Select Leave Type</option>
+                        <option value="Full Leave">Full Leave</option>
+                        <option value="Half Day">Half Day</option>
+                        <option value="Short Leave">Short Leave</option>
+                        <option value="Lieu Leave">Lieu Leave</option>
+                    </select>    
+                    <select id="leaveSlot" class="p-3 bg-slate-50 rounded-2xl border font-bold">
+                        <option value="">Select Slot</option>
+                        <option value="Morning">Morning</option>
+                        <option value="Evening">Evening</option>
+                    </select>    
+                    <button onclick="saveLeave()" class="px-6 py-3 bg-green-500 text-white rounded-2xl font-black uppercase text-xs">Save Leave</button>    
+                </div>    
+                <div id="leaveList"></div>    
+            </div>    
+
+            <!-- Summary -->
+            <div id="totalHrs" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl font-bold text-sm mt-8"></div>    
+        </div>    
+    </div>    
+</body>    
 </html>
