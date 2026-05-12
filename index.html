@@ -27,7 +27,7 @@
     
         let userHolidays = [];
         let userLeaves = {};
-        let currentCalcData = {}; // Calculation info store karanna
+        let currentCalcData = {}; 
     
         onAuthStateChanged(auth, async (user) => {    
             if (user) {    
@@ -40,7 +40,21 @@
                 document.getElementById('authScreen').classList.remove('hidden');    
                 document.getElementById('appScreen').classList.add('hidden');    
             }    
-        });    
+        });
+
+        // --- Toast Notification Logic ---
+        window.showToast = (message, type = 'success') => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-slate-900' : 'bg-red-600';
+            toast.className = `${bgColor} text-white text-[10px] font-black uppercase px-6 py-3 rounded-2xl shadow-2xl transition-all duration-300 flex items-center mb-2 animate-bounce-short`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        };
 
         async function loadLeaves() {
             const user = auth.currentUser;
@@ -66,13 +80,15 @@
             if (!date) return;    
             await setDoc(doc(db, "users", auth.currentUser.uid, "holidays", date), { active: true });    
             await loadHolidays();    
-            renderSheet();    
+            renderSheet();
+            showToast("Holiday Added");
         };    
     
         window.removeHoliday = async (date) => {    
             await deleteDoc(doc(db, "users", auth.currentUser.uid, "holidays", date));    
             await loadHolidays();    
-            renderSheet();    
+            renderSheet();
+            showToast("Holiday Removed", "error");
         };
 
         function renderHolidayList() {    
@@ -90,13 +106,13 @@
             const dateInput = document.getElementById('leaveDate').value;
             const type = document.getElementById('leaveType').value;
             const slot = document.getElementById('leaveSlot').value;
-            if(!dateInput) return alert("Select Date");
+            if(!dateInput) return showToast("Select Date", "error");
             const dateObj = new Date(dateInput);
             const day = dateObj.getDate();
             const monthId = `${dateObj.getFullYear()}-${dateObj.getMonth() + 1}`;
             userLeaves[day] = { type, slot };
             await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", monthId), userLeaves, { merge: true });
-            alert("Leave Saved!");
+            showToast("Leave Saved Successfully");
             renderSheet();
             renderLeaveList();
         };
@@ -105,6 +121,7 @@
             delete userLeaves[day];
             const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
             await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", monthId), userLeaves);
+            showToast("Leave Deleted", "error");
             renderSheet();
             renderLeaveList();
         };
@@ -172,8 +189,6 @@
 
             container.innerHTML = "";    
             let tWorkedTotal = 0, tSOTTotal = 0, tLieuCount = 0, deductionDays = 0, lastDayWasFullShift = false;
-            
-            // For logic viewer
             let weekendCount = 0, holidayCount = 0, fullLeaveCount = 0, halfDayCount = 0;
 
             for (let d = 1; d <= daysInMonth; d++) {    
@@ -241,7 +256,7 @@
                 </div>
                 <div class="mt-3 pt-2 border-t border-white/20 flex justify-between items-center">
                     <span class="text-[8px]">Lieu Days: ${tLieuCount}</span>
-                    <button onclick="showCalculationInfo()" class="bg-white/20 px-2 py-1 rounded text-[7px] font-bold uppercase tracking-wider">Show Calculation Info</button>
+                    <button onclick="showCalculationInfo()" class="bg-white/20 px-2 py-1 rounded text-[7px] font-bold uppercase tracking-wider">Show Info</button>
                 </div>
             `;    
         }
@@ -250,29 +265,21 @@
             const { daysInMonth, deductionDays, weekendCount, holidayCount, fullLeaveCount, halfDayCount, tShouldWork } = currentCalcData;
             const info = `
                 <div class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-sm" id="infoModal">
-                    <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
+                    <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl">
                         <h2 class="text-lg font-black text-blue-600 mb-6 uppercase tracking-tight">Calculation Breakdown</h2>
-                        
                         <div class="space-y-4 text-xs font-bold text-slate-600">
-                            <div class="flex justify-between border-b pb-2"><span>Total Days in Month</span><span class="text-slate-900">${daysInMonth}</span></div>
-                            
+                            <div class="flex justify-between border-b pb-2"><span>Total Days</span><span class="text-slate-900">${daysInMonth}</span></div>
                             <div class="bg-slate-50 p-4 rounded-2xl space-y-2">
-                                <p class="text-[9px] uppercase text-slate-400 mb-2">Total Deductions (-)</p>
-                                <div class="flex justify-between"><span>Weekends (Sat/Sun)</span><span>${weekendCount}</span></div>
-                                <div class="flex justify-between"><span>Holidays (Poya/Public)</span><span>${holidayCount}</span></div>
-                                <div class="flex justify-between"><span>Full Leaves/Lieu</span><span>${fullLeaveCount}</span></div>
-                                <div class="flex justify-between"><span>Half Day (0.5 each)</span><span>${halfDayCount * 0.5}</span></div>
-                                <div class="flex justify-between border-t pt-2 text-red-500"><span>Total Deducted Days</span><span>${deductionDays}</span></div>
+                                <div class="flex justify-between"><span>Weekends</span><span>${weekendCount}</span></div>
+                                <div class="flex justify-between"><span>Holidays</span><span>${holidayCount}</span></div>
+                                <div class="flex justify-between"><span>Leaves</span><span>${fullLeaveCount + (halfDayCount*0.5)}</span></div>
+                                <div class="flex justify-between border-t pt-2 text-red-500"><span>Total Deductions</span><span>${deductionDays}</span></div>
                             </div>
-
-                            <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                                <p class="text-[9px] uppercase text-blue-400 mb-1">Final Required Hours</p>
-                                <p class="text-[10px] text-blue-800 italic mb-2">Formula: (Total Days - Deductions) x 9</p>
-                                <div class="text-base text-blue-600">(${daysInMonth} - ${deductionDays}) x 9 = <span class="font-black underline">${tShouldWork.toFixed(1)} Hrs</span></div>
+                            <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-blue-600">
+                                <div class="text-base">Target: <span class="font-black underline">${tShouldWork.toFixed(1)} Hrs</span></div>
                             </div>
                         </div>
-
-                        <button onclick="document.getElementById('infoModal').remove()" class="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Close Info</button>
+                        <button onclick="document.getElementById('infoModal').remove()" class="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs">Close</button>
                     </div>
                 </div>
             `;
@@ -302,7 +309,7 @@
                         }
                     });
                     await setDoc(doc(db, "users", auth.currentUser.uid, "months", monthId), currentData, { merge: true });
-                    alert("Import Success!"); renderSheet();
+                    showToast("Import Success!"); renderSheet();
                 };
                 reader.readAsArrayBuffer(e.target.files[0]);
             };
@@ -323,14 +330,14 @@
             if(!confirm("Are you sure?")) return;
             const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
             await deleteDoc(doc(db, "users", auth.currentUser.uid, "months", monthId));
+            showToast("Month Cleared", "error");
             renderSheet();
         };
 
-    </script>    
-</head>    
-<body class="bg-slate-50 min-h-screen text-slate-900 pb-12">    
-    <div id="authScreen" class="max-w-md mx-auto pt-24 px-6 text-center">    
-        <div class="bg-white p-10 rounded-[3rem] shadow-2xl border">    
-            <h1 class="text-2xl font-black mb-8 text-blue-600">Secure Cloud</h1>    
-            <input type="email" id="email" placeholder="Email" class="w-full p-4 mb-3 bg-slate-50 rounded-2xl border outline-none text-sm">    
-      
+    </script>
+    <style>
+        @keyframes bounce-short {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .animate-bounce-short { animation: bounce-short 0.3s ease-in-ou
