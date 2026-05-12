@@ -5,30 +5,39 @@ export function cleanTime(val) {
 }
 
 export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isLastDay) {
-    // Check In/Out දත්ත තිබේදැයි ඉතා තදින් පරීක්ෂා කිරීම
+    // දත්ත තිබේදැයි පරීක්ෂා කිරීම (හිස් නම් හෝ 00:00 නම් hasData = false වේ)
     const hasData = (inTime && outTime && inTime !== "00:00" && outTime !== "00:00");
     
+    // දත්ත නොමැති දින සඳහා වන Logic එක
     if (!hasData) {
-        // දත්ත නැතිනම් Worked පැය 0 යි. 
-        // නමුත් නිවාඩු දවසක් හෝ සති අන්තයක් නොවේ නම් Required පැය 9 පෙන්විය යුතුයි.
-        let emptyReq = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) ? 0 : 9;
+        // සති අන්ත හෝ නිවාඩු දින නොවේ නම් සාමාන්‍යයෙන් පැය 9ක් වැඩ කළ යුතුය
+        let baseReq = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) ? 0 : 9;
         
-        // Leave එකක් තිබේ නම් ඒ අනුව Req වෙනස් කරන්න
+        // නිවාඩු (Leaves) ඇතුළත් කර ඇත්නම් ඒ අනුව Required පැය වෙනස් කිරීම
         if (leaveData) {
-            if (leaveData.type === "Half Day") emptyReq = 4.5;
-            else if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") emptyReq = 0;
+            if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") baseReq = 0;
+            else if (leaveData.type === "Half Day") baseReq = 4.5;
         }
 
-        return { worked: 0, req: emptyReq, ot: 0, sOT: 0, isFullDay: false };
+        return { 
+            worked: 0, 
+            req: baseReq, 
+            ot: 0, 
+            sOT: 0, 
+            isFullDay: false 
+        };
     }
 
+    // දත්ත පවතින විට ගණනය කිරීම් ආරම්භය
     let [h1, m1] = inTime.split(':').map(Number);
     let [h2, m2] = outTime.split(':').map(Number);
     
     let totalMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+    
+    // පසුදාට මාරු වන shift එකක් නම් පමණක් පැය 24ක් (මිනිත්තු 1440) එකතු කරයි
     if (isNextDay) totalMinutes += 1440;
 
-    // Short Leave Bonus
+    // Short Leave Bonus මිනිත්තු එකතු කිරීම
     let shortLeaveBonusMinutes = 0;
     if (leaveData && leaveData.type === "Short Leave") {
         if (leaveData.slot === "Morning") {
@@ -43,11 +52,14 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
     let finalMinutes = totalMinutes + shortLeaveBonusMinutes;
     let hWork = Math.floor(finalMinutes / 60);
     let mWork = finalMinutes % 60;
+    
+    // පැය 0.5 හෝ 1.0 ට වට කිරීම
     let roundedWorked = hWork + (mWork >= 25 && mWork <= 54 ? 0.5 : (mWork >= 55 ? 1.0 : 0));
 
     let isFullDay = roundedWorked >= 15; 
     let req = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
 
+    // නිවාඩු හෝ විශේෂ shift අවස්ථා වල Required පැය ගැලපීම
     if (leaveData) {
         if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") {
             req = isFullDay ? 9 : 0; 
