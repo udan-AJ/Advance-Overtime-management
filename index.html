@@ -51,6 +51,30 @@
             renderLeaveList();
         }
 
+        // --- නව විශේෂාංගය: දත්ත වෙනස් කළ සැනින් Save කිරීම ---
+        window.updateCell = async (day, field, value) => {
+            const user = auth.currentUser;
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const monthId = `${year}-${month + 1}`;
+            
+            // මුලින්ම පවතින දත්ත ලබාගන්න
+            const docRef = doc(db, "users", user.uid, "months", monthId);
+            const docSnap = await getDoc(docRef);
+            let currentData = docSnap.exists() ? docSnap.data() : {};
+            
+            if(!currentData[day]) currentData[day] = { in: "00:00", out: "00:00", isNextDay: false };
+            
+            // වෙනස් කළ අගය ඇතුළත් කරන්න
+            currentData[day][field] = value;
+            
+            // Firestore වෙත Save කරන්න
+            await setDoc(docRef, currentData, { merge: true });
+            
+            // UI එක අලුත් කරන්න
+            renderSheet();
+        };
+
         async function renderSheet() {    
             if(!auth.currentUser) return;
             const month = parseInt(document.getElementById('monthSelect').value);    
@@ -102,17 +126,17 @@
                     }
                 }
     
-                // --- Mobile Optimized UI Row ---
                 const row = document.createElement('div');    
                 row.className = `flex items-center gap-0.5 p-2 border-b ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;    
+                // මෙහිදී 'readonly' ඉවත් කර 'onchange' ඇතුළත් කර ඇත
                 row.innerHTML = `    
                     <div class="w-7 text-center flex-shrink-0">    
                         <span class="block text-[6px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
                         <span class="text-sm font-black text-slate-700 leading-none">${d}</span>    
                     </div>    
                     <div class="flex-1 grid grid-cols-2 gap-1 min-w-[80px]">    
-                        <input type="time" value="${dayData.in === '00:00' ? '' : dayData.in}" class="p-0.5 rounded border text-[9px] bg-slate-50 w-full text-center" readonly>
-                        <input type="time" value="${dayData.out === '00:00' ? '' : dayData.out}" class="p-0.5 rounded border text-[9px] bg-slate-50 w-full text-center" readonly>
+                        <input type="time" value="${dayData.in === '00:00' ? '' : dayData.in}" onchange="updateCell('${d}', 'in', this.value)" class="p-0.5 rounded border text-[9px] bg-white w-full text-center">
+                        <input type="time" value="${dayData.out === '00:00' ? '' : dayData.out}" onchange="updateCell('${d}', 'out', this.value)" class="p-0.5 rounded border text-[9px] bg-white w-full text-center">
                     </div>
                     <div class="w-16 text-center text-[7px] font-bold border-x px-0.5 leading-tight flex-shrink-0">
                         <p class="text-blue-600 truncate uppercase mb-0.5">${leaveData ? leaveData.type.split(' ')[0] : '-'}</p>
