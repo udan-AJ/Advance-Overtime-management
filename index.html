@@ -15,9 +15,7 @@
 
         let userHolidays = [];
         let userLeaves = {};
-        let currentCalcData = {};
 
-        // Authentication Observer
         initAuth(
             async (user) => {
                 document.getElementById('authScreen').classList.add('hidden');
@@ -33,185 +31,194 @@
         async function loadInitialData() {
             await loadHolidays();
             await loadLeaves();
-            await renderSheet();
+            renderSheet();
         }
 
-        async function loadHolidays() {
-            const q = query(collection(db, "users", auth.currentUser.uid, "holidays"));
-            const snap = await getDocs(q);
-            userHolidays = snap.docs.map(d => d.id);
+        async function loadHolidays() {    
+            const q = query(collection(db, "users", auth.currentUser.uid, "holidays"));    
+            const querySnapshot = await getDocs(q);    
+            userHolidays = querySnapshot.docs.map(doc => doc.id);    
             renderHolidayList();
         }
 
         async function loadLeaves() {
-            const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
-            const docSnap = await getDoc(doc(db, "users", auth.currentUser.uid, "leaves", mId));
+            const user = auth.currentUser;
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            const docSnap = await getDoc(doc(db, "users", user.uid, "leaves", monthId));
             userLeaves = docSnap.exists() ? docSnap.data() : {};
             renderLeaveList();
         }
 
-        async function renderSheet() {
-            if(!auth.currentUser) return;
-            const month = parseInt(document.getElementById('monthSelect').value);
-            const year = parseInt(document.getElementById('yearSelect').value);
-            const container = document.getElementById('sheetContainer');
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const monthId = `${year}-${month + 1}`;
+        async function renderSheet() {    
+            const user = auth.currentUser;    
+            const month = parseInt(document.getElementById('monthSelect').value);    
+            const year = parseInt(document.getElementById('yearSelect').value);    
+            const container = document.getElementById('sheetContainer');    
+            const daysInMonth = new Date(year, month + 1, 0).getDate();    
+            const monthId = `${year}-${month + 1}`;    
             
-            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-xs font-bold uppercase'>Syncing Data...</div>";
-            const docSnap = await getDoc(doc(db, "users", auth.currentUser.uid, "months", monthId));
-            const savedData = docSnap.exists() ? docSnap.data() : {};
+            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-xs font-bold uppercase'>Syncing Data...</div>";    
+            const docSnap = await getDoc(doc(db, "users", user.uid, "months", monthId));    
+            const savedData = docSnap.exists() ? docSnap.data() : {};    
 
-            container.innerHTML = "";
-            let tWorkedTotal = 0, tSOTTotal = 0, tLieuCount = 0, deductionDays = 0, lastDayWasFullShift = false;
-            let wndC = 0, holC = 0, fLC = 0, hDC = 0;
-
-            for (let d = 1; d <= daysInMonth; d++) {
+            container.innerHTML = "";    
+            let tOT = 0, tSOT = 0, tLieu = 0, tShort = 0;
+            let lastDayWasFullShift = false;
+    
+            for (let d = 1; d <= daysInMonth; d++) {    
                 const dateObj = new Date(year, month, d);
-                const isoDate = dateObj.toLocaleDateString('en-CA');
-                const isHoliday = userHolidays.includes(isoDate);
-                const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
+                const isHoliday = userHolidays.includes(dateObj.toLocaleDateString('en-CA'));    
+                const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };    
                 const leaveData = userLeaves[d];
-                const dayOfWeek = dateObj.getDay();
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dateObj.getDay(), dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
                 lastDayWasFullShift = res.isFullDay;
-                
-                tWorkedTotal += (dayOfWeek === 0 || isHoliday) ? 0 : res.worked;
-                tSOTTotal += res.sOT; 
-                if(res.lieu) tLieuCount++; 
-
-                if (dayOfWeek === 0 || dayOfWeek === 6) { deductionDays += 1; wndC++; }
-                else if (isHoliday) { deductionDays += 1; holC++; }
-                else if (leaveData) {
-                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; }
-                    else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
-                }
-
-                const row = document.createElement('div');
-                row.className = `flex items-center gap-1 p-3 border-b ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;
-                row.innerHTML = `
-                    <div class="w-8 text-center"><span class="block text-[7px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span><span class="text-base font-black text-slate-700 leading-none">${d}</span></div>
-                    <div class="flex-1 grid grid-cols-2 gap-1 opacity-80">
-                        <input type="time" value="${dayData.in === "00:00" ? "" : dayData.in}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
-                        <input type="time" value="${dayData.out === "00:00" ? "" : dayData.out}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
+                tOT += res.ot; tSOT += res.sOT; if(res.lieu) tLieu++; if(res.isShort) tShort++;
+    
+                const row = document.createElement('div');    
+                row.className = `flex items-center gap-1 p-3 border-b ${isHoliday ? 'bg-red-50' : (dateObj.getDay() === 0 ? 'bg-orange-50' : 'bg-white')}`;    
+                row.innerHTML = `    
+                    <div class="w-8 text-center">    
+                        <span class="block text-[7px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
+                        <span class="text-base font-black text-slate-700 leading-none">${d}</span>    
+                    </div>    
+                    <div class="flex-1 grid grid-cols-2 gap-1 opacity-80">    
+                        <input type="time" value="${dayData.in}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
+                        <input type="time" value="${dayData.out}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
                     </div>
-                    <div class="w-20 text-center text-[8px] font-bold border-x px-1 leading-tight"><p class="text-blue-600 truncate uppercase">${leaveData ? leaveData.type : '-'}</p>
-                        <div class="flex justify-between mt-1"><span class="text-slate-400">W:${res.worked || '-'}</span><span class="text-red-500">R:${res.req}</span></div></div>
-                    <div class="w-12 text-right"><div class="text-[8px] font-black text-blue-600">${res.ot || ''}</div><div class="text-[8px] font-black text-red-600">${res.sOT || ''}</div></div>
-                `;
-                container.appendChild(row);
-            }
-
-            const tShouldWork = (daysInMonth - deductionDays) * 9;
-            currentCalcData = { daysInMonth, deductionDays, weekendCount: wndC, holidayCount: holC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork };
-            
-            document.getElementById('totalHrs').innerHTML = `
-                <div class="grid grid-cols-2 gap-x-4 gap-y-1"><span>Worked: ${tWorkedTotal.toFixed(1)}</span><span>Required: ${tShouldWork.toFixed(1)}</span><span class="text-yellow-300">Normal OT: ${Math.max(0, tWorkedTotal - tShouldWork).toFixed(1)}</span><span class="text-orange-300">Special OT: ${tSOTTotal.toFixed(1)}</span></div>
-                <div class="mt-3 pt-2 border-t border-white/20 flex justify-between items-center"><span class="text-[8px]">Lieu Days: ${tLieuCount}</span><button onclick="showCalculationInfo()" class="bg-white/20 px-2 py-1 rounded text-[7px] font-bold uppercase tracking-wider">Details</button></div>`;
+                    <div class="w-20 text-center text-[8px] font-bold border-x px-1 leading-tight">
+                        <p class="text-blue-600 truncate uppercase">${leaveData ? leaveData.type : '-'}</p>
+                        <div class="flex justify-between mt-1"><span class="text-slate-400">W:${res.worked}</span><span class="text-red-500">R:${res.req}</span></div>
+                    </div>    
+                    <div class="w-12 text-right">    
+                        <div class="text-[8px] font-black text-blue-600">${res.ot}</div>
+                        <div class="text-[8px] font-black text-red-600">${res.sOT}</div>
+                    </div>    
+                `;    
+                container.appendChild(row);    
+            }    
+            document.getElementById('totalHrs').innerHTML = `OT: ${tOT.toFixed(1)} | SOT: ${tSOT.toFixed(1)} | Lieu: ${tLieu} | Short: ${tShort}/2`;    
         }
 
-        // Window exposed functions
         window.handleLogin = () => login(document.getElementById('email').value, document.getElementById('pass').value).catch(e => alert(e.message));
         window.handleSignup = () => signup(document.getElementById('email').value, document.getElementById('pass').value).then(() => alert("Account Created!")).catch(e => alert(e.message));
         window.logout = logout;
         window.renderSheet = renderSheet;
-        window.switchTab = (tab) => {
-            ['sheetView', 'holidayView', 'leaveView'].forEach(v => document.getElementById(v).classList.add('hidden'));
-            document.getElementById(tab + 'View').classList.remove('hidden');
-            if(tab === 'sheet') renderSheet();
-        };
 
         window.importExcel = () => {
-            const f = document.createElement('input'); f.type = 'file'; f.accept = '.xlsx, .xls';
-            f.onchange = (e) => {
-                const r = new FileReader();
-                r.onload = async (ev) => {
-                    const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-                    const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { range: 11, defval: "" });
-                    const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
-                    let data = {};
-                    json.forEach(row => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.xlsx, .xls';
+            fileInput.onchange = async (e) => {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array', cellDates: true });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { range: 11, defval: "", raw: false });
+                    const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+                    let currentData = {};
+                    jsonData.forEach(row => {
                         let dK = Object.keys(row).find(k => k.trim().toLowerCase() === "date");
                         let iK = Object.keys(row).find(k => k.trim().toLowerCase() === "check in");
                         let oK = Object.keys(row).find(k => k.trim().toLowerCase() === "check out");
                         let odK = Object.keys(row).find(k => k.trim().toLowerCase() === "out date");
+
                         if(row[dK]) {
                             let ds = String(row[dK]).trim(), p = ds.split(/[-/ ]/), day = p.length >= 3 ? (p[0].length === 4 ? parseInt(p[2]) : parseInt(p[0])) : parseInt(ds);
-                            if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds) };
+                            if(day) currentData[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds) };
                         }
                     });
-                    if(Object.keys(data).length > 0) {
-                        await setDoc(doc(db, "users", auth.currentUser.uid, "months", mId), data, { merge: true });
-                        alert("Import Success!"); loadInitialData();
-                    } else { alert("No valid data found in Excel!"); }
+                    await setDoc(doc(db, "users", auth.currentUser.uid, "months", monthId), currentData, { merge: true });
+                    alert("Import Success!"); renderSheet();
                 };
-                r.readAsArrayBuffer(e.target.files[0]);
-            }; f.click();
+                reader.readAsArrayBuffer(e.target.files[0]);
+            };
+            fileInput.click();
         };
 
-        window.addHoliday = async () => {
-            const d = document.getElementById('holidayInput').value;
-            if (!d) return;
-            await setDoc(doc(db, "users", auth.currentUser.uid, "holidays", d), { active: true });
-            await loadHolidays(); renderSheet();
+        window.switchTab = (tab) => {
+            ['sheetView', 'holidayView', 'leaveView'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.getElementById(tab + 'View').classList.remove('hidden');
         };
-        window.removeHoliday = async (d) => { await deleteDoc(doc(db, "users", auth.currentUser.uid, "holidays", d)); await loadHolidays(); renderSheet(); };
-        function renderHolidayList() { document.getElementById('holidayList').innerHTML = userHolidays.map(d => `<div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100 shadow-sm"><span class="font-bold text-slate-700 text-xs">${d}</span><button onclick="removeHoliday('${d}')" class="text-red-500 text-[10px] font-black uppercase">Remove</button></div>`).join('') || `<p class="text-slate-400 text-[10px] text-center py-4">No Holidays Added</p>`; }
-        
+
+        window.addHoliday = async () => {    
+            const date = document.getElementById('holidayInput').value;    
+            if (!date) return;    
+            await setDoc(doc(db, "users", auth.currentUser.uid, "holidays", date), { active: true });    
+            await loadHolidays(); renderSheet();    
+        };    
+    
+        window.removeHoliday = async (date) => {    
+            await deleteDoc(doc(db, "users", auth.currentUser.uid, "holidays", date));    
+            await loadHolidays(); renderSheet();    
+        };
+
+        function renderHolidayList() {    
+            document.getElementById('holidayList').innerHTML = userHolidays.map(date => `<div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100 shadow-sm"><span class="font-bold text-slate-700 text-xs">${date}</span><button onclick="removeHoliday('${date}')" class="text-red-500 text-[10px] font-black uppercase">Remove</button></div>`).join('') || `<p class="text-slate-400 text-[10px] text-center py-4">No Holidays Added</p>`;    
+        }
+
         window.saveLeave = async () => {
             const dt = document.getElementById('leaveDate').value; const ty = document.getElementById('leaveType').value; const sl = document.getElementById('leaveSlot').value;
             if(!dt) return alert("Select Date"); const dObj = new Date(dt); const day = dObj.getDate(); const mId = `${dObj.getFullYear()}-${dObj.getMonth() + 1}`;
             userLeaves[day] = { type: ty, slot: sl }; await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", mId), userLeaves, { merge: true });
             alert("Leave Saved!"); await loadLeaves(); renderSheet();
         };
-        window.deleteLeave = async (day) => { delete userLeaves[day]; const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`; await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", mId), userLeaves); await loadLeaves(); renderSheet(); };
-        function renderLeaveList() { document.getElementById('leaveList').innerHTML = Object.entries(userLeaves).map(([d, da]) => `<div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100"><div class="text-[10px] font-bold text-slate-600">Day ${d} - ${da.type} (${da.slot})</div><button onclick="deleteLeave('${d}')" class="text-red-500 text-[10px] font-black uppercase">Delete</button></div>`).join('') || `<p class="text-slate-400 text-[10px] text-center py-4">No leaves recorded.</p>`; }
-        
-        window.showCalculationInfo = () => {
-            const { daysInMonth, deductionDays, weekendCount, holidayCount, fullLeaveCount, halfDayCount, tShouldWork } = currentCalcData;
-            const info = `<div class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-sm" id="infoModal"><div class="bg-white rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl animate-in fade-in zoom-in duration-200"><h2 class="text-lg font-black text-blue-600 mb-6 uppercase tracking-tight">Calculation Info</h2><div class="space-y-4 text-xs font-bold text-slate-600"><div class="flex justify-between border-b pb-2"><span>Days in Month</span><span class="text-slate-900">${daysInMonth}</span></div><div class="bg-slate-50 p-4 rounded-2xl space-y-2"><p class="text-[9px] uppercase text-slate-400">Deductions</p><div class="flex justify-between"><span>Weekends</span><span>${weekendCount}</span></div><div class="flex justify-between"><span>Holidays</span><span>${holidayCount}</span></div><div class="flex justify-between"><span>Leaves</span><span>${fullLeaveCount + (halfDayCount*0.5)}</span></div><div class="flex justify-between border-t pt-2 text-red-500"><span>Total Deducted</span><span>${deductionDays}</span></div></div><div class="p-4 bg-blue-50 rounded-2xl border border-blue-100"><div class="text-base text-blue-600">Required: <span class="font-black underline">${tShouldWork.toFixed(1)} Hrs</span></div></div></div><button onclick="document.getElementById('infoModal').remove()" class="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs">Close</button></div></div>`;
-            document.body.insertAdjacentHTML('beforeend', info);
+
+        window.deleteLeave = async (day) => {
+            delete userLeaves[day]; const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            await setDoc(doc(db, "users", auth.currentUser.uid, "leaves", mId), userLeaves); await loadLeaves(); renderSheet();
         };
-        window.clearMonthData = async () => { if(!confirm("Are you sure?")) return; const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`; await deleteDoc(doc(db, "users", auth.currentUser.uid, "months", mId)); renderSheet(); };
-    </script>
-</head>
-<body class="bg-slate-50 min-h-screen text-slate-900 pb-12">
+
+        function renderLeaveList() {
+            document.getElementById('leaveList').innerHTML = Object.entries(userLeaves).map(([day, data]) => `<div class="flex justify-between items-center p-3 bg-white rounded-xl mb-2 border border-slate-100"><div class="text-[10px] font-bold text-slate-600">Day ${day} - ${data.type}</div><button onclick="deleteLeave('${day}')" class="text-red-500 text-[10px] font-black uppercase">Delete</button></div>`).join('') || `<p class="text-slate-400 text-[10px] text-center py-4">No leaves recorded.</p>`;
+        }
+
+        window.clearMonthData = async () => {
+            if(!confirm("Are you sure?")) return;
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            await deleteDoc(doc(db, "users", auth.currentUser.uid, "months", monthId)); renderSheet();
+        };
+
+    </script>    
+</head>    
+<body class="bg-slate-50 min-h-screen text-slate-900 pb-12">    
     <div id="authScreen" class="max-w-md mx-auto pt-24 px-6 text-center">    
         <div class="bg-white p-10 rounded-[3rem] shadow-2xl border">    
             <h1 class="text-2xl font-black mb-8 text-blue-600">Cloud Sync</h1>    
             <input type="email" id="email" placeholder="Email" class="w-full p-4 mb-3 bg-slate-50 rounded-2xl border outline-none text-sm">    
             <input type="password" id="pass" placeholder="Password" class="w-full p-4 mb-8 bg-slate-50 rounded-2xl border outline-none text-sm">    
             <button onclick="handleLogin()" class="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl mb-4">LOGIN</button>
-            <button onclick="handleSignup()" class="w-full bg-slate-100 text-slate-600 font-bold py-4 rounded-2xl text-[10px] uppercase border">Create New Account</button>
+            <button onclick="handleSignup()" class="w-full bg-slate-100 text-slate-600 font-bold py-4 rounded-2xl text-[10px] uppercase border tracking-widest">Create Account</button>
         </div>    
     </div>    
-
-    <div id="appScreen" class="hidden max-w-lg mx-auto">
-        <div class="bg-white flex text-center border-b sticky top-0 z-20 shadow-sm">
-            <button onclick="switchTab('sheet')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Sheet</button>
-            <button onclick="switchTab('leave')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Leaves</button>
-            <button onclick="switchTab('holiday')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Holidays</button>
-        </div>
-
-        <div id="sheetView" class="p-4">
-            <div class="bg-blue-600 p-6 rounded-[2.5rem] text-white shadow-xl mb-4">
-                <div class="flex justify-between items-start mb-4">
-                    <div id="totalHrs" class="text-[10px] font-black uppercase flex-1">Syncing...</div>
+    
+    <div id="appScreen" class="hidden max-w-lg mx-auto">    
+        <div class="bg-white flex text-center border-b sticky top-0 z-20 shadow-sm">    
+            <button onclick="switchTab('sheet')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Sheet</button>    
+            <button onclick="switchTab('leave')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Leaves</button>    
+            <button onclick="switchTab('holiday')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Holidays</button>    
+        </div>    
+    
+        <div id="sheetView" class="p-4">    
+            <div class="bg-blue-600 p-6 rounded-[2.5rem] text-white shadow-xl mb-4">    
+                <div class="flex justify-between items-center mb-4">    
+                    <div id="totalHrs" class="text-[10px] font-black uppercase">Syncing...</div>    
                     <button onclick="logout()" class="text-[8px] font-black bg-white/20 px-2 py-1 rounded">LOGOUT</button>
                 </div>
-                <div class="flex gap-2 mb-4">
-                    <select id="yearSelect" onchange="renderSheet(); loadLeaves();" class="bg-white/20 p-2 rounded-xl text-[10px] flex-1 outline-none border-none"><option>2026</option></select>
+                <div class="flex gap-2 mb-4">    
+                    <select id="yearSelect" onchange="renderSheet(); loadLeaves();" class="bg-white/20 p-2 rounded-xl text-[10px] flex-1 outline-none border-none"><option>2026</option></select>    
                     <select id="monthSelect" onchange="renderSheet(); loadLeaves();" class="bg-white/20 p-2 rounded-xl text-[10px] flex-1 outline-none border-none">
-                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option><option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option><option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option><option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                    </select>
-                </div>
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>    
+                </div>    
                 <div class="flex gap-2">
                     <button onclick="importExcel()" class="flex-1 bg-white text-blue-600 text-[10px] py-3 rounded-xl font-black uppercase">Import</button>
                     <button onclick="clearMonthData()" class="flex-1 bg-red-500 text-white text-[10px] py-3 rounded-xl font-black uppercase">Clear</button>
                 </div>
-            </div>
-            <div id="sheetContainer" class="bg-white rounded-[2rem] border overflow-hidden shadow-sm min-h-[200px]"></div>
+            </div>    
+            <div id="sheetContainer" class="bg-white rounded-[2rem] border overflow-hidden shadow-sm"></div>    
         </div>
 
         <div id="leaveView" class="hidden p-6">
@@ -224,15 +231,15 @@
             </div>
             <div id="leaveList"></div>
         </div>
-
-        <div id="holidayView" class="hidden p-6">
+    
+        <div id="holidayView" class="hidden p-6">    
             <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm mb-6">
                 <h3 class="font-black text-xs uppercase mb-4 text-slate-400">Add Holiday</h3>
-                <input type="date" id="holidayInput" class="w-full p-4 bg-slate-50 border rounded-xl mb-4 outline-none">
+                <input type="date" id="holidayInput" class="w-full p-4 bg-slate-50 border rounded-xl mb-4 outline-none">    
                 <button onclick="addHoliday()" class="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg">ADD TO LIST</button>
             </div>
             <div id="holidayList"></div>
-        </div>
-    </div>
-</body>
+        </div>    
+    </div>    
+</body>    
 </html>
