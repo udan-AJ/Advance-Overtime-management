@@ -36,8 +36,8 @@
 
         async function loadHolidays() {    
             const q = query(collection(db, "users", auth.currentUser.uid, "holidays"));    
-            const querySnapshot = await getDocs(q);    
-            userHolidays = querySnapshot.docs.map(doc => doc.id);    
+            const snap = await getDocs(q);    
+            userHolidays = snap.docs.map(doc => doc.id);    
             renderHolidayList();
         }
 
@@ -62,42 +62,76 @@
             const savedData = docSnap.exists() ? docSnap.data() : {};    
 
             container.innerHTML = "";    
-            let tOT = 0, tSOT = 0, tLieu = 0, tShort = 0;
+            
+            let totalNormalHoursWorked = 0;
+            let totalSpecialOTHours = 0;
+            let deductionDays = 0;
             let lastDayWasFullShift = false;
     
             for (let d = 1; d <= daysInMonth; d++) {    
                 const dateObj = new Date(year, month, d);
-                const isHoliday = userHolidays.includes(dateObj.toLocaleDateString('en-CA'));    
+                const dayOfWeek = dateObj.getDay();
+                const isoDate = dateObj.toLocaleDateString('en-CA');
+                const isHoliday = userHolidays.includes(isoDate);    
                 const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };    
                 const leaveData = userLeaves[d];
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dateObj.getDay(), dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
                 lastDayWasFullShift = res.isFullDay;
-                tOT += res.ot; tSOT += res.sOT; if(res.lieu) tLieu++; if(res.isShort) tShort++;
+
+                // --- Card Calculation Logic ---
+                if (dayOfWeek === 0 || isHoliday) {
+                    totalSpecialOTHours += res.worked;
+                } else {
+                    totalNormalHoursWorked += res.worked;
+                }
+
+                // Deduction: Sat, Sun, Poya, Leaves
+                if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) {
+                    deductionDays += 1;
+                } else if (leaveData) {
+                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") {
+                        deductionDays += 1;
+                    } else if (leaveData.type === "Half Day") {
+                        deductionDays += 0.5;
+                    }
+                }
     
                 const row = document.createElement('div');    
-                row.className = `flex items-center gap-1 p-3 border-b ${isHoliday ? 'bg-red-50' : (dateObj.getDay() === 0 ? 'bg-orange-50' : 'bg-white')}`;    
+                row.className = `flex items-center gap-1 p-3 border-b ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;    
                 row.innerHTML = `    
                     <div class="w-8 text-center">    
                         <span class="block text-[7px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
                         <span class="text-base font-black text-slate-700 leading-none">${d}</span>    
                     </div>    
                     <div class="flex-1 grid grid-cols-2 gap-1 opacity-80">    
-                        <input type="time" value="${dayData.in}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
-                        <input type="time" value="${dayData.out}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
+                        <input type="time" value="${dayData.in === '00:00' ? '' : dayData.in}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
+                        <input type="time" value="${dayData.out === '00:00' ? '' : dayData.out}" class="p-1 rounded-lg border text-[10px] bg-slate-50" readonly>
                     </div>
                     <div class="w-20 text-center text-[8px] font-bold border-x px-1 leading-tight">
                         <p class="text-blue-600 truncate uppercase">${leaveData ? leaveData.type : '-'}</p>
                         <div class="flex justify-between mt-1"><span class="text-slate-400">W:${res.worked}</span><span class="text-red-500">R:${res.req}</span></div>
                     </div>    
                     <div class="w-12 text-right">    
-                        <div class="text-[8px] font-black text-blue-600">${res.ot}</div>
-                        <div class="text-[8px] font-black text-red-600">${res.sOT}</div>
+                        <div class="text-[8px] font-black text-blue-600">${res.ot > 0 ? res.ot : ''}</div>
+                        <div class="text-[8px] font-black text-red-600">${res.sOT > 0 ? res.sOT : ''}</div>
                     </div>    
                 `;    
                 container.appendChild(row);    
             }    
-            document.getElementById('totalHrs').innerHTML = `OT: ${tOT.toFixed(1)} | SOT: ${tSOT.toFixed(1)} | Lieu: ${tLieu} | Short: ${tShort}/2`;    
+
+            // Final Calculations
+            const totalHoursShouldWork = (daysInMonth - deductionDays) * 9;
+            const totalNormalOTHours = Math.max(0, totalNormalHoursWorked - totalHoursShouldWork);
+
+            document.getElementById('totalHrs').innerHTML = `
+                <div class="grid grid-cols-1 gap-1 text-[9px] leading-tight">
+                    <div class="flex justify-between"><span>Total Normal Hours Worked:</span> <span class="font-bold">${totalNormalHoursWorked.toFixed(1)}</span></div>
+                    <div class="flex justify-between"><span>Total Hours Should Work:</span> <span class="font-bold">${totalHoursShouldWork.toFixed(1)}</span></div>
+                    <div class="flex justify-between text-yellow-300"><span>Total Normal Overtime Hours:</span> <span class="font-bold">${totalNormalOTHours.toFixed(1)}</span></div>
+                    <div class="flex justify-between text-orange-300 border-t border-white/20 pt-1 mt-1"><span>Total Special Overtime Hours:</span> <span class="font-bold">${totalSpecialOTHours.toFixed(1)}</span></div>
+                </div>
+            `;    
         }
 
         window.handleLogin = () => login(document.getElementById('email').value, document.getElementById('pass').value).catch(e => alert(e.message));
@@ -106,38 +140,37 @@
         window.renderSheet = renderSheet;
 
         window.importExcel = () => {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.xlsx, .xls';
-            fileInput.onchange = async (e) => {
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array', cellDates: true });
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { range: 11, defval: "", raw: false });
-                    const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
-                    let currentData = {};
-                    jsonData.forEach(row => {
+            const f = document.createElement('input'); f.type = 'file'; f.accept = '.xlsx, .xls';
+            f.onchange = (e) => {
+                const r = new FileReader();
+                r.onload = async (ev) => {
+                    const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { range: 11, defval: "", raw: false });
+                    const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+                    let data = {};
+                    json.forEach(row => {
                         let dK = Object.keys(row).find(k => k.trim().toLowerCase() === "date");
                         let iK = Object.keys(row).find(k => k.trim().toLowerCase() === "check in");
                         let oK = Object.keys(row).find(k => k.trim().toLowerCase() === "check out");
                         let odK = Object.keys(row).find(k => k.trim().toLowerCase() === "out date");
-
                         if(row[dK]) {
                             let ds = String(row[dK]).trim(), p = ds.split(/[-/ ]/), day = p.length >= 3 ? (p[0].length === 4 ? parseInt(p[2]) : parseInt(p[0])) : parseInt(ds);
-                            if(day) currentData[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds) };
+                            if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds) };
                         }
                     });
-                    await setDoc(doc(db, "users", auth.currentUser.uid, "months", monthId), currentData, { merge: true });
-                    alert("Import Success!"); renderSheet();
+                    if(Object.keys(data).length > 0) {
+                        await setDoc(doc(db, "users", auth.currentUser.uid, "months", mId), data, { merge: true });
+                        alert("Import Success!"); loadInitialData();
+                    } else { alert("No data found in Excel!"); }
                 };
-                reader.readAsArrayBuffer(e.target.files[0]);
-            };
-            fileInput.click();
+                r.readAsArrayBuffer(e.target.files[0]);
+            }; f.click();
         };
 
         window.switchTab = (tab) => {
             ['sheetView', 'holidayView', 'leaveView'].forEach(v => document.getElementById(v).classList.add('hidden'));
             document.getElementById(tab + 'View').classList.remove('hidden');
+            if(tab === 'sheet') renderSheet();
         };
 
         window.addHoliday = async () => {    
@@ -187,38 +220,38 @@
             <input type="email" id="email" placeholder="Email" class="w-full p-4 mb-3 bg-slate-50 rounded-2xl border outline-none text-sm">    
             <input type="password" id="pass" placeholder="Password" class="w-full p-4 mb-8 bg-slate-50 rounded-2xl border outline-none text-sm">    
             <button onclick="handleLogin()" class="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl mb-4">LOGIN</button>
-            <button onclick="handleSignup()" class="w-full bg-slate-100 text-slate-600 font-bold py-4 rounded-2xl text-[10px] uppercase border tracking-widest">Create Account</button>
+            <button onclick="handleSignup()" class="w-full bg-slate-100 text-slate-600 font-bold py-4 rounded-2xl text-[10px] uppercase border">Create Account</button>
         </div>    
     </div>    
-    
-    <div id="appScreen" class="hidden max-w-lg mx-auto">    
-        <div class="bg-white flex text-center border-b sticky top-0 z-20 shadow-sm">    
-            <button onclick="switchTab('sheet')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Sheet</button>    
-            <button onclick="switchTab('leave')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Leaves</button>    
-            <button onclick="switchTab('holiday')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Holidays</button>    
-        </div>    
-    
-        <div id="sheetView" class="p-4">    
-            <div class="bg-blue-600 p-6 rounded-[2.5rem] text-white shadow-xl mb-4">    
-                <div class="flex justify-between items-center mb-4">    
-                    <div id="totalHrs" class="text-[10px] font-black uppercase">Syncing...</div>    
+
+    <div id="appScreen" class="hidden max-w-lg mx-auto">
+        <div class="bg-white flex text-center border-b sticky top-0 z-20 shadow-sm">
+            <button onclick="switchTab('sheet')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Sheet</button>
+            <button onclick="switchTab('leave')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Leaves</button>
+            <button onclick="switchTab('holiday')" class="flex-1 py-4 font-black text-[10px] uppercase text-slate-500">Holidays</button>
+        </div>
+
+        <div id="sheetView" class="p-4">
+            <div class="bg-blue-600 p-6 rounded-[2.5rem] text-white shadow-xl mb-4">
+                <div class="flex justify-between items-start mb-4">
+                    <div id="totalHrs" class="text-[10px] font-black uppercase flex-1">Syncing...</div>
                     <button onclick="logout()" class="text-[8px] font-black bg-white/20 px-2 py-1 rounded">LOGOUT</button>
                 </div>
-                <div class="flex gap-2 mb-4">    
-                    <select id="yearSelect" onchange="renderSheet(); loadLeaves();" class="bg-white/20 p-2 rounded-xl text-[10px] flex-1 outline-none border-none"><option>2026</option></select>    
+                <div class="flex gap-2 mb-4">
+                    <select id="yearSelect" onchange="renderSheet(); loadLeaves();" class="bg-white/20 p-2 rounded-xl text-[10px] flex-1 outline-none border-none"><option>2026</option></select>
                     <select id="monthSelect" onchange="renderSheet(); loadLeaves();" class="bg-white/20 p-2 rounded-xl text-[10px] flex-1 outline-none border-none">
                         <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
                         <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
                         <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
                         <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                    </select>    
-                </div>    
+                    </select>
+                </div>
                 <div class="flex gap-2">
                     <button onclick="importExcel()" class="flex-1 bg-white text-blue-600 text-[10px] py-3 rounded-xl font-black uppercase">Import</button>
                     <button onclick="clearMonthData()" class="flex-1 bg-red-500 text-white text-[10px] py-3 rounded-xl font-black uppercase">Clear</button>
                 </div>
-            </div>    
-            <div id="sheetContainer" class="bg-white rounded-[2rem] border overflow-hidden shadow-sm"></div>    
+            </div>
+            <div id="sheetContainer" class="bg-white rounded-[2rem] border overflow-hidden shadow-sm min-h-[200px]"></div>
         </div>
 
         <div id="leaveView" class="hidden p-6">
@@ -231,15 +264,15 @@
             </div>
             <div id="leaveList"></div>
         </div>
-    
-        <div id="holidayView" class="hidden p-6">    
+
+        <div id="holidayView" class="hidden p-6">
             <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm mb-6">
                 <h3 class="font-black text-xs uppercase mb-4 text-slate-400">Add Holiday</h3>
-                <input type="date" id="holidayInput" class="w-full p-4 bg-slate-50 border rounded-xl mb-4 outline-none">    
+                <input type="date" id="holidayInput" class="w-full p-4 bg-slate-50 border rounded-xl mb-4 outline-none">
                 <button onclick="addHoliday()" class="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg">ADD TO LIST</button>
             </div>
             <div id="holidayList"></div>
-        </div>    
-    </div>    
-</body>    
+        </div>
+    </div>
+</body>
 </html>
