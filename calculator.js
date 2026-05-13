@@ -7,8 +7,11 @@ export function cleanTime(val) {
 export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isLastDay) {
     const hasData = (inTime && outTime && inTime !== "00:00" && outTime !== "00:00");
     
+    // දත්ත නොමැති දින සඳහා Logic එක
     if (!hasData) {
-        let baseReq = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) ? 0 : 9;
+        // කලින් දවසේ Full Shift එකක් කළා නම් හෝ නිවාඩු/සතිඅන්ත නම් Req 0 වේ.
+        let baseReq = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
+        
         if (leaveData) {
             if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") baseReq = 0;
             else if (leaveData.type === "Half Day") baseReq = 4.5;
@@ -22,28 +25,13 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
     let totalMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
     if (isNextDay) totalMinutes += 1440;
 
-    // --- Short Leave Logic (Worked Hours වලට එකතු කිරීම) ---
+    // Short Leave Bonus Logic
     let shortLeaveBonusMinutes = 0;
     if (leaveData && leaveData.type === "Short Leave") {
         let arrivalMin = h1 * 60 + m1;
         let exitMin = h2 * 60 + m2;
-
-        if (leaveData.slot === "Morning") {
-            // Morning Shift: 08:30 සිට In Time එක දක්වා
-            shortLeaveBonusMinutes = Math.min(90, Math.max(0, arrivalMin - 510));
-        } 
-        else if (leaveData.slot === "Evening") {
-            // Evening Shift: Out Time සිට 17:00 (05:00 PM) දක්වා
-            shortLeaveBonusMinutes = Math.min(90, Math.max(0, 1020 - exitMin));
-        } 
-        else if (leaveData.slot === "Night Start") {
-            // Night Shift Start: 20:00 (08:00 PM) සිට In Time දක්වා
-            shortLeaveBonusMinutes = Math.min(90, Math.max(0, arrivalMin - 1200));
-        }
-        else if (leaveData.slot === "Night End") {
-            // Night Shift End: Out Time සිට 05:00 AM (පසුදා) දක්වා
-            shortLeaveBonusMinutes = Math.min(90, Math.max(0, 300 - exitMin));
-        }
+        if (leaveData.slot === "Morning") shortLeaveBonusMinutes = Math.min(90, Math.max(0, arrivalMin - 510));
+        else if (leaveData.slot === "Evening") shortLeaveBonusMinutes = Math.min(90, Math.max(0, 1020 - exitMin));
     }
     
     let finalMinutes = totalMinutes + shortLeaveBonusMinutes;
@@ -53,7 +41,8 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
 
     let isFullDay = roundedWorked >= 15; 
     
-    // Short Leave තිබුණත් සාමාන්‍ය දවසක Required පැය 9 ම වේ
+    // Friday & Day-Night Logic
+    // කලින් දවසේ Full Shift එකක් කළා නම් අද Req 0 වේ.
     let req = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
 
     if (leaveData) {
@@ -62,9 +51,13 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
         } else if (leaveData.type === "Half Day") {
             req = Math.max(0, req - 4.5);
         }
-        // Short Leave සඳහා මෙහිදී req වෙනස් නොකරයි (එය 9 ලෙස පවතී)
     } else if (isFullDay && req > 0) {
-        req = isLastDay ? 9 : 18; 
+        // සිකුරාදා (Day 5) දිනක Full Shift කළහොත් Req 9 ක් පමණි (සෙනසුරාදා නිවාඩු නිසා)
+        if (dayOfWeek === 5) {
+            req = 9;
+        } else {
+            req = isLastDay ? 9 : 18; 
+        }
     }
 
     let ot = (dayOfWeek === 0 || isHoliday) ? 0 : Math.max(0, roundedWorked - req);
