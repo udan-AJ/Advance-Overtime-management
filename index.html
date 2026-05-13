@@ -51,27 +51,15 @@
             renderLeaveList();
         }
 
-        // --- නව විශේෂාංගය: දත්ත වෙනස් කළ සැනින් Save කිරීම ---
         window.updateCell = async (day, field, value) => {
             const user = auth.currentUser;
-            const month = parseInt(document.getElementById('monthSelect').value);
-            const year = parseInt(document.getElementById('yearSelect').value);
-            const monthId = `${year}-${month + 1}`;
-            
-            // මුලින්ම පවතින දත්ත ලබාගන්න
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
             const docRef = doc(db, "users", user.uid, "months", monthId);
             const docSnap = await getDoc(docRef);
-            let currentData = docSnap.exists() ? docSnap.data() : {};
-            
-            if(!currentData[day]) currentData[day] = { in: "00:00", out: "00:00", isNextDay: false };
-            
-            // වෙනස් කළ අගය ඇතුළත් කරන්න
-            currentData[day][field] = value;
-            
-            // Firestore වෙත Save කරන්න
-            await setDoc(docRef, currentData, { merge: true });
-            
-            // UI එක අලුත් කරන්න
+            let data = docSnap.exists() ? docSnap.data() : {};
+            if(!data[day]) data[day] = { in: "00:00", out: "00:00", isNextDay: false };
+            data[day][field] = value;
+            await setDoc(docRef, data, { merge: true });
             renderSheet();
         };
 
@@ -83,17 +71,14 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();    
             const monthId = `${year}-${month + 1}`;    
             
-            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-xs font-bold uppercase'>Syncing Data...</div>";    
+            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-[10px] font-bold uppercase'>Syncing Data...</div>";    
             const docSnap = await getDoc(doc(db, "users", auth.currentUser.uid, "months", monthId));    
             const savedData = docSnap.exists() ? docSnap.data() : {};    
 
             container.innerHTML = "";    
-            
-            let totalNormalHoursWorked = 0;
-            let totalSpecialOTHours = 0;
-            let deductionDays = 0;
+            let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
             let lastDayWasFullShift = false;
-            let weekendCount = 0, holidayCount = 0, fullLeaveCount = 0, halfDayCount = 0;
+            let wC = 0, hC = 0, fLC = 0, hDC = 0;
     
             for (let d = 1; d <= daysInMonth; d++) {    
                 const dateObj = new Date(year, month, d);
@@ -104,31 +89,25 @@
                 const leaveData = userLeaves[d];
 
                 const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                
+                // Lieu Days logic: Weekend/Holiday සහ පැය 9+ වැඩ
+                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
+
                 lastDayWasFullShift = res.isFullDay;
 
-                if (dayOfWeek === 0 || isHoliday) {
-                    totalSpecialOTHours += res.worked;
-                } else {
-                    totalNormalHoursWorked += res.worked;
-                }
+                if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
+                else tNormalHrs += res.worked;
 
                 if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) {
                     deductionDays += 1;
-                    if(dayOfWeek === 0 || dayOfWeek === 6) weekendCount++;
-                    else holidayCount++;
+                    if(dayOfWeek === 0 || dayOfWeek === 6) wC++; else hC++;
                 } else if (leaveData) {
-                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") {
-                        deductionDays += 1;
-                        fullLeaveCount++;
-                    } else if (leaveData.type === "Half Day") {
-                        deductionDays += 0.5;
-                        halfDayCount++;
-                    }
+                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; }
+                    else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
                 }
     
                 const row = document.createElement('div');    
                 row.className = `flex items-center gap-0.5 p-2 border-b ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;    
-                // මෙහිදී 'readonly' ඉවත් කර 'onchange' ඇතුළත් කර ඇත
                 row.innerHTML = `    
                     <div class="w-7 text-center flex-shrink-0">    
                         <span class="block text-[6px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
@@ -150,56 +129,31 @@
                 container.appendChild(row);    
             }    
 
-            const totalHoursShouldWork = (daysInMonth - deductionDays) * 9;
-            const totalNormalOTHours = Math.max(0, totalNormalHoursWorked - totalHoursShouldWork);
-
-            currentCalcData = { daysInMonth, deductionDays, weekendCount, holidayCount, fullLeaveCount, halfDayCount, totalHoursShouldWork };
+            const tShouldWork = (daysInMonth - deductionDays) * 9;
+            currentCalcData = { daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork };
 
             document.getElementById('totalHrs').innerHTML = `
                 <div class="grid grid-cols-1 gap-1 text-[9px] leading-tight mb-2">
-                    <div class="flex justify-between"><span>Normal Hours Worked:</span> <span class="font-bold">${totalNormalHoursWorked.toFixed(1)}</span></div>
-                    <div class="flex justify-between"><span>Hours Should Work:</span> <span class="font-bold">${totalHoursShouldWork.toFixed(1)}</span></div>
-                    <div class="flex justify-between text-yellow-300"><span>Normal Overtime:</span> <span class="font-bold">${totalNormalOTHours.toFixed(1)}</span></div>
-                    <div class="flex justify-between text-orange-300 border-t border-white/20 pt-1 mt-1"><span>Special Overtime:</span> <span class="font-bold">${totalSpecialOTHours.toFixed(1)}</span></div>
+                    <div class="flex justify-between"><span>Normal Hours Worked:</span> <span class="font-bold">${tNormalHrs.toFixed(1)}</span></div>
+                    <div class="flex justify-between"><span>Hours Should Work:</span> <span class="font-bold">${tShouldWork.toFixed(1)}</span></div>
+                    <div class="flex justify-between text-yellow-300"><span>Normal Overtime:</span> <span class="font-bold">${Math.max(0, tNormalHrs - tShouldWork).toFixed(1)}</span></div>
+                    <div class="flex justify-between text-orange-300"><span>Special Overtime:</span> <span class="font-bold">${tSpecialOT.toFixed(1)}</span></div>
+                    <div class="flex justify-between text-blue-300 border-t border-white/20 pt-1 mt-1"><span>Lieu Days Earned:</span> <span class="font-bold">${tLieuDays}</span></div>
                 </div>
-                <button onclick="showCalculationInfo()" class="w-full bg-white/20 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-white/30 transition-all">View Should Work Logic</button>
+                <button onclick="showCalculationInfo()" class="w-full bg-white/20 py-2 rounded-xl text-[8px] font-black uppercase">View Logic</button>
             `;    
         }
 
         window.showCalculationInfo = () => {
             const d = currentCalcData;
-            const modalHtml = `
-                <div id="logicModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-                    <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <h3 class="text-blue-600 font-black text-lg mb-6 uppercase tracking-tight">Calculation Logic</h3>
-                        <div class="space-y-4 text-xs font-bold text-slate-600">
-                            <div class="flex justify-between border-b pb-2"><span>Total Days in Month</span><span>${d.daysInMonth}</span></div>
-                            <div class="bg-slate-50 p-4 rounded-2xl space-y-2">
-                                <p class="text-[9px] uppercase text-slate-400 mb-2">Deductions (-)</p>
-                                <div class="flex justify-between"><span>Saturdays & Sundays</span><span>${d.weekendCount}</span></div>
-                                <div class="flex justify-between"><span>Holidays / Poya</span><span>${d.holidayCount}</span></div>
-                                <div class="flex justify-between"><span>Full Leaves / Lieu</span><span>${d.fullLeaveCount}</span></div>
-                                <div class="flex justify-between"><span>Half Days (0.5 each)</span><span>${d.halfDayCount * 0.5}</span></div>
-                                <div class="flex justify-between border-t pt-2 text-red-500"><span>Total Deducted Days</span><span>${d.deductionDays}</span></div>
-                            </div>
-                            <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                                <p class="text-[9px] uppercase text-blue-400 mb-1">Formula</p>
-                                <p class="text-blue-800 italic mb-2">(Days - Deductions) x 9</p>
-                                <div class="text-base text-blue-600">(${d.daysInMonth} - ${d.deductionDays}) x 9 = <span class="font-black underline">${d.totalHoursShouldWork.toFixed(1)} Hrs</span></div>
-                            </div>
-                        </div>
-                        <button onclick="document.getElementById('logicModal').remove()" class="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Close Details</button>
-                    </div>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = `<div id="logicModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"><div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl"><h3 class="text-blue-600 font-black text-lg mb-6 uppercase">Calculation Logic</h3><div class="space-y-4 text-xs font-bold text-slate-600"><div class="flex justify-between border-b pb-2"><span>Total Days</span><span>${d.daysInMonth}</span></div><div class="bg-slate-50 p-4 rounded-2xl space-y-2"><p class="text-[9px] uppercase text-slate-400">Deductions (-)</p><div class="flex justify-between"><span>Sat/Sun</span><span>${d.weekendCount}</span></div><div class="flex justify-between"><span>Holidays</span><span>${d.holidayCount}</span></div><div class="flex justify-between"><span>Leaves</span><span>${d.fullLeaveCount + (d.halfDayCount*0.5)}</span></div><div class="flex justify-between border-t pt-2 text-red-500"><span>Total Deducted</span><span>${d.deductionDays}</span></div></div><div class="p-4 bg-blue-50 rounded-2xl border border-blue-100"><div class="text-base text-blue-600">(${d.daysInMonth} - ${d.deductionDays}) x 9 = <span class="font-black underline">${d.tShouldWork.toFixed(1)} Hrs</span></div></div></div><button onclick="document.getElementById('logicModal').remove()" class="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs">Close</button></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', modal);
         };
 
         window.handleLogin = () => login(document.getElementById('email').value, document.getElementById('pass').value).catch(e => alert(e.message));
         window.handleSignup = () => signup(document.getElementById('email').value, document.getElementById('pass').value).then(() => alert("Account Created!")).catch(e => alert(e.message));
         window.logout = logout;
         window.renderSheet = renderSheet;
-
         window.importExcel = () => {
             const f = document.createElement('input'); f.type = 'file'; f.accept = '.xlsx, .xls';
             f.onchange = (e) => {
@@ -219,10 +173,8 @@
                             if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds) };
                         }
                     });
-                    if(Object.keys(data).length > 0) {
-                        await setDoc(doc(db, "users", auth.currentUser.uid, "months", mId), data, { merge: true });
-                        alert("Import Success!"); loadInitialData();
-                    } else { alert("No data found in Excel!"); }
+                    await setDoc(doc(db, "users", auth.currentUser.uid, "months", mId), data, { merge: true });
+                    alert("Import Success!"); loadInitialData();
                 };
                 r.readAsArrayBuffer(e.target.files[0]);
             }; f.click();
@@ -281,7 +233,7 @@
 
         <div id="sheetView" class="p-3">
             <div class="bg-blue-600 p-5 rounded-[2rem] text-white shadow-xl mb-4">
-                <div id="totalHrs" class="mb-3">Syncing...</div>
+                <div id="totalHrs" class="mb-3 font-black">Syncing...</div>
                 <div class="flex gap-2 mb-3">
                     <select id="yearSelect" onchange="loadInitialData();" class="bg-white/20 p-2 rounded-xl text-[9px] flex-1 outline-none border-none"><option>2026</option></select>
                     <select id="monthSelect" onchange="loadInitialData();" class="bg-white/20 p-2 rounded-xl text-[9px] flex-1 outline-none border-none">
