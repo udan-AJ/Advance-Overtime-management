@@ -9,11 +9,10 @@
         import { db, auth } from './firebase-config.js';
         import { initAuth, logout } from './auth.js';
         import { calculateRow } from './calculator.js';
-        import { collection, query, getDocs, doc, getDoc, setDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, query, getDocs, doc, getDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allUsers = [];
 
-        // Auth Check for Admin
         initAuth(async (user) => {
             const userDoc = await getDoc(doc(db, "users", user.uid));
             if (userDoc.exists() && userDoc.data().isAdmin) {
@@ -34,42 +33,23 @@
         async function fetchUsers() {
             const snap = await getDocs(collection(db, "users"));
             allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderUsers();
-        }
-
-        function renderUsers() {
             const list = document.getElementById('userList');
             list.innerHTML = allUsers.map(u => `
-                <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl mb-2 border">
-                    <div>
-                        <p class="font-black text-sm uppercase text-slate-700">${u.email}</p>
-                        <p class="text-[10px] text-slate-400">UID: ${u.id}</p>
-                    </div>
-                    <button onclick="viewUserTimesheet('${u.id}')" class="bg-blue-600 text-white text-[10px] px-4 py-2 rounded-xl font-bold uppercase">View</button>
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl mb-2 border text-[10px]">
+                    <span class="font-bold truncate w-32 uppercase">${u.email.split('@')[0]}</span>
+                    <span class="${u.isAdmin ? 'text-green-600' : 'text-slate-400'} font-black italic">${u.isAdmin ? 'ADMIN' : 'USER'}</span>
                 </div>
             `).join('');
         }
 
-        // Summary Calculation for All Users
         async function loadSummary() {
             const month = document.getElementById('monthFilter').value;
             const year = document.getElementById('yearFilter').value;
             const monthId = `${year}-${parseInt(month) + 1}`;
             const container = document.getElementById('summaryTable');
-            container.innerHTML = "Calculating...";
+            container.innerHTML = "<p class='text-center p-10 font-bold animate-pulse'>Crunching Numbers...</p>";
 
-            let html = `
-                <table class="w-full text-left text-[11px] border-collapse">
-                    <thead>
-                        <tr class="text-slate-400 uppercase border-b font-black">
-                            <th class="py-3">User</th>
-                            <th>Normal OT</th>
-                            <th>Special OT</th>
-                            <th>Lieu</th>
-                        </tr>
-                    </thead>
-                    <tbody class="font-bold">
-            `;
+            let html = `<table class="w-full text-[10px]"><thead class="border-b text-slate-400 uppercase font-black"><tr class="text-left"><th class="pb-2">User</th><th>N-OT</th><th>S-OT</th><th>Lieu</th></tr></thead><tbody>`;
 
             for (const u of allUsers) {
                 const monthSnap = await getDoc(doc(db, "users", u.id, "months", monthId));
@@ -86,90 +66,62 @@
 
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateObj = new Date(year, month, d);
-                    const dayOfWeek = dateObj.getDay();
                     const dayData = savedData[d] || { in: "00:00", out: "00:00", isNextDay: false };
-                    const isHoliday = userHolidays.includes(dateObj.toLocaleDateString('en-CA'));
-                    const leave = userLeaves[d];
-
-                    const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastFull, leave, d === daysInMonth);
+                    const res = calculateRow(dayData.in, dayData.out, userHolidays.includes(dateObj.toLocaleDateString('en-CA')), dateObj.getDay(), dayData.isNextDay, lastFull, userLeaves[d], d === daysInMonth);
                     
-                    if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieu++;
-                    if (dayOfWeek === 0 || isHoliday) tSOT += res.worked; else tWorked += res.worked;
+                    if ((dateObj.getDay() === 0 || userHolidays.includes(dateObj.toLocaleDateString('en-CA'))) && res.worked >= 9) tLieu++;
+                    if (dateObj.getDay() === 0 || userHolidays.includes(dateObj.toLocaleDateString('en-CA'))) tSOT += res.worked; else tWorked += res.worked;
 
-                    // Deduction Logic
-                    if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductions += 1;
-                    else if (leave) {
-                        if (leave.type === "Full Leave" || leave.type === "Lieu Leave") deductions += 1;
-                        else if (leave.type === "Half Day") deductions += 0.5;
+                    if (dateObj.getDay() === 0 || dateObj.getDay() === 6 || userHolidays.includes(dateObj.toLocaleDateString('en-CA'))) deductions += 1;
+                    else if (userLeaves[d]) {
+                        if (userLeaves[d].type === "Full Leave" || userLeaves[d].type === "Lieu Leave") deductions += 1;
+                        else if (userLeaves[d].type === "Half Day") deductions += 0.5;
                     }
                     lastFull = res.isFullDay;
                 }
-
-                const shouldWork = (daysInMonth - deductions) * 9;
-                tNOT = Math.max(0, tWorked - shouldWork);
-
-                html += `
-                    <tr class="border-b">
-                        <td class="py-4 text-blue-600">${u.email.split('@')[0].toUpperCase()}</td>
-                        <td>${tNOT.toFixed(1)}</td>
-                        <td>${tSOT.toFixed(1)}</td>
-                        <td class="text-orange-500">${tLieu}</td>
-                    </tr>
-                `;
+                const sWork = (daysInMonth - deductions) * 9;
+                html += `<tr class="border-b font-bold"><td class="py-3 text-blue-600 truncate">${u.email.split('@')[0].toUpperCase()}</td><td>${Math.max(0, tWorked - sWork).toFixed(1)}</td><td>${tSOT.toFixed(1)}</td><td class="text-orange-500">${tLieu}</td></tr>`;
             }
-            html += `</tbody></table>`;
-            container.innerHTML = html;
+            container.innerHTML = html + `</tbody></table>`;
         }
 
         async function loadLogs() {
-            const q = query(collection(db, "logs"), orderBy("time", "desc"), limit(10));
+            const q = query(collection(db, "logs"), orderBy("time", "desc"), limit(8));
             const snap = await getDocs(q);
-            document.getElementById('logList').innerHTML = snap.docs.map(d => {
-                const data = d.data();
-                return `<div class="text-[10px] p-2 border-b flex justify-between">
-                    <span class="font-bold uppercase">${data.user}</span>
-                    <span class="text-slate-400">${new Date(data.time).toLocaleString()}</span>
-                </div>`;
-            }).join('');
+            document.getElementById('logList').innerHTML = snap.docs.map(d => `<div class="text-[9px] py-1 border-b flex justify-between uppercase font-bold text-slate-500"><span>${d.data().user.split('@')[0]}</span><span>${new Date(d.data().time).toLocaleTimeString()}</span></div>`).join('');
         }
 
         window.loadSummary = loadSummary;
         window.logout = logout;
     </script>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div id="adminContent" class="hidden max-w-4xl mx-auto p-6">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-xl font-black uppercase text-slate-800 tracking-tighter">Admin <span class="text-blue-600">Portal</span></h1>
-            <button onclick="logout()" class="bg-white text-red-500 px-6 py-2 rounded-2xl text-[10px] font-black uppercase shadow-sm border">Exit</button>
+<body class="bg-slate-100 min-h-screen font-sans">
+    <div id="adminContent" class="hidden max-w-4xl mx-auto p-4 md:p-8">
+        <div class="flex justify-between items-center mb-8 bg-white p-4 rounded-3xl border shadow-sm">
+            <h1 class="text-lg font-black uppercase text-slate-800">Admin <span class="text-blue-600">Dashboard</span></h1>
+            <button onclick="logout()" class="bg-red-50 text-red-500 px-5 py-2 rounded-2xl text-[10px] font-black uppercase border border-red-100">Sign Out</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Left: User Management -->
-            <div class="md:col-span-1">
-                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border mb-6">
-                    <h2 class="text-xs font-black uppercase text-slate-400 mb-4">Users</h2>
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-[2rem] border shadow-sm">
+                    <h2 class="text-[10px] font-black uppercase text-slate-400 mb-4">Users List</h2>
                     <div id="userList"></div>
                 </div>
-                <div class="bg-slate-800 p-6 rounded-[2.5rem] text-white shadow-lg">
-                    <h2 class="text-xs font-black uppercase text-slate-400 mb-4">Recent Access</h2>
+                <div class="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl">
+                    <h2 class="text-[10px] font-black uppercase text-slate-500 mb-4 tracking-widest">Login History</h2>
                     <div id="logList"></div>
                 </div>
             </div>
 
-            <!-- Right: Summary Dashboard -->
             <div class="md:col-span-2">
-                <div class="bg-white p-8 rounded-[3rem] shadow-sm border min-h-[500px]">
-                    <div class="flex justify-between items-center mb-8">
-                        <h2 class="text-lg font-black uppercase tracking-tight">Monthly Summary</h2>
-                        <div class="flex gap-2">
-                            <select id="yearFilter" onchange="loadSummary()" class="bg-slate-50 border p-2 rounded-xl text-[10px] font-bold outline-none">
-                                <option>2026</option>
-                            </select>
-                            <select id="monthFilter" onchange="loadSummary()" class="bg-slate-50 border p-2 rounded-xl text-[10px] font-bold outline-none">
-                                <option value="3">APRIL</option>
-                                <option value="4">MAY</option>
+                <div class="bg-white p-6 md:p-10 rounded-[3rem] border shadow-sm min-h-[500px]">
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+                        <h2 class="font-black uppercase text-sm">Monthly Summary Report</h2>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <select id="yearFilter" onchange="loadSummary()" class="bg-slate-50 border p-2 rounded-xl text-[10px] font-bold flex-1"><option>2026</option></select>
+                            <select id="monthFilter" onchange="loadSummary()" class="bg-slate-50 border p-2 rounded-xl text-[10px] font-bold flex-1">
+                                <option value="3" selected>APRIL</option><option value="4">MAY</option>
                             </select>
                         </div>
                     </div>
