@@ -1,4 +1,4 @@
-export function generatePDF(data, rows, name, epf) {
+export function generatePDF(data, rows, name, epf, userLeaves) {
     // 24h format eka 12h AM/PM format ekata harawana function eka
     const formatAMPM = (timeStr) => {
         if (!timeStr || timeStr === "-" || timeStr === "00:00") return "-";
@@ -6,22 +6,27 @@ export function generatePDF(data, rows, name, epf) {
         hours = parseInt(hours);
         const ampm = hours >= 12 ? 'PM' : 'AM';
         hours = hours % 12;
-        hours = hours ? hours : 12; // '0' kiyanne '12'
+        hours = hours ? hours : 12; 
         return `${hours}:${minutes} ${ampm}`;
     };
 
     // Logic: Working Days = Total Days - (Saturdays + Sundays + Holidays)
     const officialWorkingDays = data.daysInMonth - (data.weekendCount + data.holidayCount);
 
-    // Filter only leave records for the leaves card
-    const leaveEntries = rows.filter(r => r.type && r.type !== "");
+    // Filter and sort leaves from the userLeaves object (directly from Index.html)
+    const leaveEntries = Object.entries(userLeaves || {})
+        .map(([day, val]) => ({
+            day: parseInt(day),
+            date: `${data.year}/${data.monthId.split('-')[1].padStart(2,'0')}/${day.padStart(2,'0')}`,
+            type: val.type
+        }))
+        .sort((a, b) => a.day - b.day);
 
-    // Suddha karapu Nama (spaces ain kara underscore damma)
     const cleanName = name.trim().replace(/\s+/g, '_');
     const cleanEpf = epf.trim().replace(/\s+/g, '_');
 
     const content = `
-        <div style="font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif; padding: 20px; color: #000; font-size: 11px; line-height: 1.3;">
+        <div style="font-family: 'Trebuchet MS', Arial, sans-serif; padding: 20px; color: #000; font-size: 11px; line-height: 1.3;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                 <div>
                     <h2 style="margin:0; font-size: 15px; font-weight: bold;">CIC FEEDS (PVT) LTD.</h2>
@@ -41,14 +46,14 @@ export function generatePDF(data, rows, name, epf) {
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9px; text-align: center; table-layout: fixed;">
                 <thead>
                     <tr style="background: #f2f2f2; font-weight: bold;">
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%; word-wrap: break-word;">DATE</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%; word-wrap: break-word;">TIME IN</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%; word-wrap: break-word;">TIME OUT</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%; word-wrap: break-word;">TOTAL HOURS</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 17%; word-wrap: break-word;">TYPE OF WORKS</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%; word-wrap: break-word;">OVER TIME</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%; word-wrap: break-word;">SIGNATURE OF EMPLOYEE</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%; word-wrap: break-word;">SIGNATURE OF SUPERVISOR</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%;">DATE</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%;">TIME IN</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%;">TIME OUT</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%;">TOTAL HOURS</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 17%;">TYPE OF WORKS</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%;">OVER TIME</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%;">SIGNATURE OF EMPLOYEE</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%;">SIGNATURE OF SUPERVISOR</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -149,7 +154,6 @@ export function generatePDF(data, rows, name, epf) {
 
     const opt = {
         margin: 0.1,
-        // File name format eka methana hadala thiyenne
         filename: `${cleanEpf}_${cleanName}_${data.year}_${data.monthName}.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { scale: 3, useCORS: true },
