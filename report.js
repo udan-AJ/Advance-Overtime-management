@@ -1,6 +1,24 @@
 export function generatePDF(data, rows, name, epf) {
+    // 24h format eka 12h AM/PM format ekata harawana function eka
+    const formatAMPM = (timeStr) => {
+        if (!timeStr || timeStr === "-" || timeStr === "00:00") return "-";
+        let [hours, minutes] = timeStr.split(':');
+        hours = parseInt(hours);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // '0' kiyanne '12'
+        return `${hours}:${minutes} ${ampm}`;
+    };
+
     // Logic: Working Days = Total Days - (Saturdays + Sundays + Holidays)
     const officialWorkingDays = data.daysInMonth - (data.weekendCount + data.holidayCount);
+
+    // Filter only leave records for the leaves card
+    const leaveEntries = rows.filter(r => r.type && r.type !== "");
+
+    // Suddha karapu Nama (spaces ain kara underscore damma)
+    const cleanName = name.trim().replace(/\s+/g, '_');
+    const cleanEpf = epf.trim().replace(/\s+/g, '_');
 
     const content = `
         <div style="font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif; padding: 20px; color: #000; font-size: 11px; line-height: 1.3;">
@@ -23,75 +41,91 @@ export function generatePDF(data, rows, name, epf) {
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9px; text-align: center; table-layout: fixed;">
                 <thead>
                     <tr style="background: #f2f2f2; font-weight: bold;">
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 12%; word-wrap: break-word;">DATE</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">TIME IN</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">TIME OUT</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">TOTAL HOURS</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 18%; word-wrap: break-word;">TYPE OF WORKS</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">OVER TIME</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 15%; word-wrap: break-word;">SIGNATURE OF EMPLOYEE</th>
-                        <th style="border: 1px solid #000; padding: 6px 2px; width: 15%; word-wrap: break-word;">SIGNATURE OF SUPERVISOR</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%; word-wrap: break-word;">DATE</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%; word-wrap: break-word;">TIME IN</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%; word-wrap: break-word;">TIME OUT</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%; word-wrap: break-word;">TOTAL HOURS</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 17%; word-wrap: break-word;">TYPE OF WORKS</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%; word-wrap: break-word;">OVER TIME</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%; word-wrap: break-word;">SIGNATURE OF EMPLOYEE</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%; word-wrap: break-word;">SIGNATURE OF SUPERVISOR</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${rows.map(row => `
                         <tr>
-                            <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold;">${row.date}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.in}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.out}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.worked || 0}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold; font-size: 8px;">${row.type}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold;">${(row.ot + row.sOT).toFixed(1)}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;"></td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;"></td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px; font-weight: bold;">${row.date}</td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px;">${formatAMPM(row.in)}</td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px;">${formatAMPM(row.out)}</td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px;">${row.worked || 0}</td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px; font-weight: bold; font-size: 8px;">${row.type}</td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px; font-weight: bold;">${(row.ot + row.sOT).toFixed(1)}</td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px;"></td>
+                            <td style="border: 1px solid #000; padding: 5.5px 2px;"></td>
                         </tr>
                     `).join('')}
                     <tr style="background: #fafafa; font-weight: bold;">
-                        <td colspan="5" style="border: 1px solid #000; padding: 8px; text-align: right;">TOTAL OT HOURS</td>
-                        <td style="border: 1px solid #000; padding: 8px;">${(data.tNormalOT + data.tSpecialOT).toFixed(1)}</td>
+                        <td colspan="5" style="border: 1px solid #000; padding: 7px; text-align: right;">TOTAL OT HOURS</td>
+                        <td style="border: 1px solid #000; padding: 7px;">${(data.tNormalOT + data.tSpecialOT).toFixed(1)}</td>
                         <td style="border: 1px solid #000;"></td>
                         <td style="border: 1px solid #000;"></td>
                     </tr>
                 </tbody>
             </table>
 
-            <div style="font-size: 11px; font-weight: bold; background: #fdfdfd; padding: 12px; border: 1px solid #eee; border-radius: 8px;">
-                <div style="display: table; width: 100%;">
-                    <div style="display: table-row;">
-                        <div style="display: table-cell; width: 220px; padding: 3px 0;">NO. OF WORKING DAYS IN THE MONTH</div>
-                        <div style="display: table-cell; width: 20px;">-</div>
-                        <div style="display: table-cell; padding-left: 15px;">${officialWorkingDays}</div>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 3; font-size: 10px; font-weight: bold; background: #fdfdfd; padding: 12px; border: 1px solid #eee; border-radius: 8px;">
+                    <div style="display: table; width: 100%;">
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; width: 180px; padding: 2px 0;">NO. OF WORKING DAYS IN THE MONTH</div>
+                            <div style="display: table-cell; width: 15px;">-</div>
+                            <div style="display: table-cell; padding-left: 10px;">${officialWorkingDays}</div>
+                        </div>
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; padding: 2px 0;">NO. OF LEAVES TAKEN</div>
+                            <div style="display: table-cell;">-</div>
+                            <div style="display: table-cell; padding-left: 10px;">${data.fullLeaveCount + (data.halfDayCount * 0.5)}</div>
+                        </div>
+                        <div style="display: table-row; border-top: 1px dotted #ccc;">
+                            <div style="display: table-cell; padding: 4px 0 2px 0;">∴ NO. OF HOURS HE SHOULD WORK</div>
+                            <div style="display: table-cell; padding-top: 4px;">-</div>
+                            <div style="display: table-cell; padding-left: 10px; padding-top: 4px;">${data.tShouldWork}</div>
+                        </div>
+                        <div style="display: table-row;"><div style="display: table-cell; height: 8px;"></div></div>
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; padding: 2px 0;">TOTAL HOURS OF NORMAL OVERTIME</div>
+                            <div style="display: table-cell;">-</div>
+                            <div style="display: table-cell; padding-left: 10px;">${data.tNormalOT.toFixed(1)}</div>
+                        </div>
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; padding: 2px 0;">TOTAL HOURS OF SPECIAL OVERTIME</div>
+                            <div style="display: table-cell;">-</div>
+                            <div style="display: table-cell; padding-left: 10px;">${data.tSpecialOT.toFixed(1)}</div>
+                        </div>
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; padding: 2px 0;">NUMBER OF SPECIAL LIEU LEAVES</div>
+                            <div style="display: table-cell;">-</div>
+                            <div style="display: table-cell; padding-left: 10px;">${data.tLieuDays}</div>
+                        </div>
                     </div>
-                    <div style="display: table-row;">
-                        <div style="display: table-cell; padding: 3px 0;">NO. OF LEAVES TAKEN</div>
-                        <div style="display: table-cell;">-</div>
-                        <div style="display: table-cell; padding-left: 15px;">${data.fullLeaveCount + (data.halfDayCount * 0.5)}</div>
-                    </div>
-                    <div style="display: table-row; border-top: 1px dotted #ccc;">
-                        <div style="display: table-cell; padding: 6px 0 3px 0;">∴ NO. OF HOURS HE SHOULD WORK</div>
-                        <div style="display: table-cell; padding-top: 6px;">-</div>
-                        <div style="display: table-cell; padding-left: 15px; padding-top: 6px;">${data.tShouldWork}</div>
-                    </div>
-                    <div style="display: table-row;"><div style="display: table-cell; height: 10px;"></div></div>
-                    <div style="display: table-row;">
-                        <div style="display: table-cell; padding: 3px 0;">TOTAL HOURS OF NORMAL OVERTIME</div>
-                        <div style="display: table-cell;">-</div>
-                        <div style="display: table-cell; padding-left: 15px;">${data.tNormalOT.toFixed(1)}</div>
-                    </div>
-                    <div style="display: table-row;">
-                        <div style="display: table-cell; padding: 3px 0;">TOTAL HOURS OF SPECIAL OVERTIME</div>
-                        <div style="display: table-cell;">-</div>
-                        <div style="display: table-cell; padding-left: 15px;">${data.tSpecialOT.toFixed(1)}</div>
-                    </div>
-                    <div style="display: table-row;">
-                        <div style="display: table-cell; padding: 3px 0;">NUMBER OF SPECIAL LIEU LEAVES</div>
-                        <div style="display: table-cell;">-</div>
-                        <div style="display: table-cell; padding-left: 15px;">${data.tLieuDays}</div>
-                    </div>
+                </div>
+
+                <div style="flex: 2; font-size: 9px; background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 8px;">
+                    <div style="font-weight: bold; border-bottom: 1px solid #000; margin-bottom: 5px; padding-bottom: 2px; text-transform: uppercase;">Leaves Summary</div>
+                    ${leaveEntries.length > 0 ? `
+                        <table style="width: 100%; border-collapse: collapse;">
+                            ${leaveEntries.map(l => `
+                                <tr>
+                                    <td style="padding: 2px 0; font-weight: bold; width: 50%;">${l.date}</td>
+                                    <td style="padding: 2px 0; color: #555;">${l.type}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    ` : '<p style="color: #999; font-style: italic;">No leaves recorded.</p>'}
                 </div>
             </div>
 
-            <div style="margin-top: 60px; font-size: 11px; font-weight: bold;">
+            <div style="margin-top: 50px; font-size: 11px; font-weight: bold;">
                 <div style="display: table; width: 100%; border-spacing: 0 25px;">
                     <div style="display: table-row;">
                         <div style="display: table-cell; width: 140px;">PREPARED BY</div>
@@ -115,7 +149,8 @@ export function generatePDF(data, rows, name, epf) {
 
     const opt = {
         margin: 0.1,
-        filename: `CIC_OT_Report_${data.monthName}_${data.year}.pdf`,
+        // File name format eka methana hadala thiyenne
+        filename: `${cleanEpf}_${cleanName}_${data.year}_${data.monthName}.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { scale: 3, useCORS: true },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
