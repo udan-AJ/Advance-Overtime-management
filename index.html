@@ -60,7 +60,7 @@
             const docRef = doc(db, "users", user.uid, "months", monthId);
             const docSnap = await getDoc(docRef);
             let data = docSnap.exists() ? docSnap.data() : {};
-            if(!data[day]) data[day] = { in: "00:00", out: "00:00", isNextDay: false };
+            if(!data[day]) data[day] = { in: "00:00", out: "00:00", isNextDay: false, workType: "" };
             data[day][field] = value;
             await setDoc(docRef, data, { merge: true });
             renderSheet();
@@ -89,7 +89,7 @@
                 const dayOfWeek = dateObj.getDay();
                 const isoDate = dateObj.toLocaleDateString('en-CA');
                 const isHoliday = userHolidays.includes(isoDate);    
-                const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };    
+                const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false, workType: "" };    
                 const leaveData = userLeaves[d];
 
                 const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
@@ -112,7 +112,8 @@
                         date: `${year}/${String(month + 1).padStart(2,'0')}/${String(d).padStart(2,'0')}`, 
                         in: (dayData.in !== "00:00" && dayData.in !== "") ? dayData.in : "-", 
                         out: (dayData.out !== "00:00" && dayData.out !== "") ? dayData.out : "-", 
-                        worked: res.worked, ot: res.ot, sOT: res.sOT, type: leaveData ? leaveData.type : '' 
+                        worked: res.worked, ot: res.ot, sOT: res.sOT, 
+                        type: dayData.workType || "" 
                     });
                 }
     
@@ -126,7 +127,13 @@
                     <div class="flex-1 grid grid-cols-2 gap-1 min-w-[80px]">    
                         <div class="flex flex-col gap-1">
                             <input type="time" value="${dayData.in === '00:00' ? '' : dayData.in}" onchange="updateCell('${d}', 'in', this.value)" class="p-0.5 rounded border text-[9px] bg-white w-full text-center outline-none">
-                            <span class="text-[5px] text-slate-400 text-center uppercase font-bold tracking-tighter">In Time</span>
+                            <select onchange="updateCell('${d}', 'workType', this.value)" class="p-0.5 rounded border text-[8px] bg-slate-50 w-full outline-none font-bold">
+                                <option value="">WORK</option>
+                                <option value="IR" ${dayData.workType === 'IR' ? 'selected' : ''}>IR</option>
+                                <option value="DR" ${dayData.workType === 'DR' ? 'selected' : ''}>DR</option>
+                                <option value="FFL" ${dayData.workType === 'FFL' ? 'selected' : ''}>FFL</option>
+                                <option value="LAB" ${dayData.workType === 'LAB' ? 'selected' : ''}>LAB</option>
+                            </select>
                         </div>
                         <div class="flex flex-col gap-1">
                             <input type="time" value="${dayData.out === '00:00' ? '' : dayData.out}" onchange="updateCell('${d}', 'out', this.value)" class="p-0.5 rounded border text-[9px] bg-white w-full text-center outline-none">
@@ -212,7 +219,7 @@
                         let odK = Object.keys(row).find(k => k.trim().toLowerCase() === "out date");
                         if(row[dK]) {
                             let ds = String(row[dK]).trim(), p = ds.split(/[-/ ]/), day = p.length >= 3 ? (p[0].length === 4 ? parseInt(p[2]) : parseInt(p[0])) : parseInt(ds);
-                            if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds) };
+                            if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds), workType: "" };
                         }
                     });
                     await setDoc(doc(db, "users", auth.currentUser.uid, "months", mId), data, { merge: true });
@@ -232,7 +239,6 @@
     </script>    
 </head>    
 <body class="bg-slate-50 min-h-screen text-slate-900 pb-12">    
-    <!-- Auth Screen -->
     <div id="authScreen" class="max-w-md mx-auto pt-24 px-6 text-center">    
         <div class="bg-white p-10 rounded-[3rem] shadow-2xl border">    
             <h1 class="text-2xl font-black mb-8 text-blue-600 uppercase tracking-tight">Cloud Sync</h1>    
@@ -243,7 +249,6 @@
         </div>    
     </div>    
 
-    <!-- App Screen -->
     <div id="appScreen" class="hidden max-w-lg mx-auto">
         <div class="p-3 flex justify-between items-center bg-white border-b sticky top-0 z-30 shadow-sm">
             <div class="flex items-center gap-1.5">
