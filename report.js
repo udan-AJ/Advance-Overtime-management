@@ -1,5 +1,4 @@
 export function generatePDF(data, rows, name, epf, userLeaves) {
-    // 24h format eka 12h AM/PM format ekata harawana function eka
     const formatAMPM = (timeStr) => {
         if (!timeStr || timeStr === "-" || timeStr === "00:00") return "-";
         let [hours, minutes] = timeStr.split(':');
@@ -10,10 +9,9 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
         return `${hours}:${minutes} ${ampm}`;
     };
 
-    // Logic: Working Days = Total Days - (Saturdays + Sundays + Holidays)
     const officialWorkingDays = data.daysInMonth - (data.weekendCount + data.holidayCount);
 
-    // Filter and sort leaves from the userLeaves object (directly from Index.html)
+    // Index එකේ leaves section එකෙන් ලැබෙන දත්ත කෙලින්ම ගන්නවා
     const leaveEntries = Object.entries(userLeaves || {})
         .map(([day, val]) => ({
             day: parseInt(day),
