@@ -11,7 +11,7 @@ export function generatePDF(data, rows, name, epf) {
                     <h4 style="margin:5px 0; font-size: 11px; text-decoration: underline; font-weight: bold;">OVER TIME CLAIM FORM - MONTH - ${data.monthName} - ${data.year}</h4>
                 </div>
                 <div style="text-align: right; font-size: 9px; font-weight: bold; color: #333;">
-                    IR - Ingredient Receiving | DR - Drug Room<br>FFL - Finished Feed Line | LAB - Laboratory Works
+                    IR - INGREDIENT RECEIVING | DR - DRUG ROOM<br>FFL - FINISHED FEED LINE | LAB - LABORATORY WORKS
                 </div>
             </div>
 
@@ -20,33 +20,36 @@ export function generatePDF(data, rows, name, epf) {
                 <p style="margin: 3px 0;">EPF NO. : ${epf.toUpperCase()}</p>
             </div>
 
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; text-align: center;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9px; text-align: center; table-layout: fixed;">
                 <thead>
-                    <tr style="background: #f2f2f2;">
-                        <th style="border: 1px solid #000; padding: 5px;">DATE</th>
-                        <th style="border: 1px solid #000; padding: 5px;">TIME IN</th>
-                        <th style="border: 1px solid #000; padding: 5px;">TIME OUT</th>
-                        <th style="border: 1px solid #000; padding: 5px;">Total Hours</th>
-                        <th style="border: 1px solid #000; padding: 5px;">Type OF Works</th>
-                        <th style="border: 1px solid #000; padding: 5px;">Over Time</th>
-                        <th style="border: 1px solid #000; padding: 5px;">SIGNATURE</th>
+                    <tr style="background: #f2f2f2; font-weight: bold;">
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 12%; word-wrap: break-word;">DATE</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">TIME IN</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">TIME OUT</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">TOTAL HOURS</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 18%; word-wrap: break-word;">TYPE OF WORKS</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 10%; word-wrap: break-word;">OVER TIME</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 15%; word-wrap: break-word;">SIGNATURE OF EMPLOYEE</th>
+                        <th style="border: 1px solid #000; padding: 6px 2px; width: 15%; word-wrap: break-word;">SIGNATURE OF SUPERVISOR</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${rows.map(row => `
                         <tr>
-                            <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${row.date}</td>
-                            <td style="border: 1px solid #000; padding: 4px;">${row.in}</td>
-                            <td style="border: 1px solid #000; padding: 4px;">${row.out}</td>
-                            <td style="border: 1px solid #000; padding: 4px;">${row.worked || 0}</td>
-                            <td style="border: 1px solid #000; padding: 4px; font-size: 9px; font-style: italic;">${row.type}</td>
-                            <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${(row.ot + row.sOT).toFixed(1)}</td>
-                            <td style="border: 1px solid #000; padding: 4px;"></td>
+                            <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold;">${row.date}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.in}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.out}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.worked || 0}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold; font-size: 8px;">${row.type}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold;">${(row.ot + row.sOT).toFixed(1)}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;"></td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;"></td>
                         </tr>
                     `).join('')}
                     <tr style="background: #fafafa; font-weight: bold;">
-                        <td colspan="5" style="border: 1px solid #000; padding: 6px; text-align: right;">Total OT Hours</td>
-                        <td style="border: 1px solid #000; padding: 6px;">${(data.tNormalOT + data.tSpecialOT).toFixed(1)}</td>
+                        <td colspan="5" style="border: 1px solid #000; padding: 8px; text-align: right;">TOTAL OT HOURS</td>
+                        <td style="border: 1px solid #000; padding: 8px;">${(data.tNormalOT + data.tSpecialOT).toFixed(1)}</td>
+                        <td style="border: 1px solid #000;"></td>
                         <td style="border: 1px solid #000;"></td>
                     </tr>
                 </tbody>
@@ -88,8 +91,8 @@ export function generatePDF(data, rows, name, epf) {
                 </div>
             </div>
 
-            <div style="margin-top: 40px; font-size: 11px; font-weight: bold;">
-                <div style="display: table; width: 100%; border-spacing: 0 12px;">
+            <div style="margin-top: 60px; font-size: 11px; font-weight: bold;">
+                <div style="display: table; width: 100%; border-spacing: 0 25px;">
                     <div style="display: table-row;">
                         <div style="display: table-cell; width: 140px;">PREPARED BY</div>
                         <div style="display: table-cell; width: 20px;">:</div>
