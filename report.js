@@ -11,7 +11,10 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
 
     const officialWorkingDays = data.daysInMonth - (data.weekendCount + data.holidayCount);
 
-    // Index එකේ leaves section එකෙන් ලැබෙන දත්ත කෙලින්ම ගන්නවා
+    // Filter logic: Worked hours 0 ta wadi (overtime karapu) dawas witarak table ekata gannawa
+    const filteredOTRows = rows.filter(row => row.worked > 0);
+
+    // Index eke leaves section eken okkoma leaves summary ekata gannawa
     const leaveEntries = Object.entries(userLeaves || {})
         .map(([day, val]) => ({
             day: parseInt(day),
@@ -44,31 +47,29 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9px; text-align: center; table-layout: fixed;">
                 <thead>
                     <tr style="background: #f2f2f2; font-weight: bold;">
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%;">DATE</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%;">TIME IN</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 11%;">TIME OUT</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%;">TOTAL HOURS</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 17%;">TYPE OF WORKS</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 9%;">OVER TIME</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%;">SIGNATURE OF EMPLOYEE</th>
-                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 16%;">SIGNATURE OF SUPERVISOR</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 12%;">DATE</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 12%;">TIME IN</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 12%;">TIME OUT</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 10%;">TOTAL HOURS</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 12%;">OVER TIME</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 17%;">SIGNATURE OF EMPLOYEE</th>
+                        <th style="border: 1px solid #000; padding: 5.5px 2px; width: 17%;">SIGNATURE OF SUPERVISOR</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${rows.map(row => `
+                    ${filteredOTRows.map(row => `
                         <tr>
                             <td style="border: 1px solid #000; padding: 5.5px 2px; font-weight: bold;">${row.date}</td>
                             <td style="border: 1px solid #000; padding: 5.5px 2px;">${formatAMPM(row.in)}</td>
                             <td style="border: 1px solid #000; padding: 5.5px 2px;">${formatAMPM(row.out)}</td>
                             <td style="border: 1px solid #000; padding: 5.5px 2px;">${row.worked || 0}</td>
-                            <td style="border: 1px solid #000; padding: 5.5px 2px; font-weight: bold; font-size: 8px;">${row.type}</td>
                             <td style="border: 1px solid #000; padding: 5.5px 2px; font-weight: bold;">${(row.ot + row.sOT).toFixed(1)}</td>
                             <td style="border: 1px solid #000; padding: 5.5px 2px;"></td>
                             <td style="border: 1px solid #000; padding: 5.5px 2px;"></td>
                         </tr>
                     `).join('')}
                     <tr style="background: #fafafa; font-weight: bold;">
-                        <td colspan="5" style="border: 1px solid #000; padding: 7px; text-align: right;">TOTAL OT HOURS</td>
+                        <td colspan="4" style="border: 1px solid #000; padding: 7px; text-align: right;">TOTAL OT HOURS</td>
                         <td style="border: 1px solid #000; padding: 7px;">${(data.tNormalOT + data.tSpecialOT).toFixed(1)}</td>
                         <td style="border: 1px solid #000;"></td>
                         <td style="border: 1px solid #000;"></td>
@@ -128,7 +129,7 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
                 </div>
             </div>
 
-            <div style="margin-top: 50px; font-size: 11px; font-weight: bold;">
+            <div style="margin-top: 60px; font-size: 11px; font-weight: bold;">
                 <div style="display: table; width: 100%; border-spacing: 0 25px;">
                     <div style="display: table-row;">
                         <div style="display: table-cell; width: 140px;">PREPARED BY</div>
