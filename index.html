@@ -183,7 +183,11 @@
             const name = document.getElementById('pdfFullName').value || "..................";
             const epf = document.getElementById('pdfEpf').value || "..................";
             document.getElementById('userModal').remove();
-            generatePDF(currentCalcData, currentMonthRows, name, epf);
+            
+            const monthId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+            currentCalcData.monthId = monthId;
+
+            generatePDF(currentCalcData, currentMonthRows, name, epf, userLeaves);
         };
 
         window.showCalculationInfo = () => {
