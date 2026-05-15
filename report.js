@@ -1,4 +1,7 @@
 export function generatePDF(data, rows, name, epf) {
+    // Logic: Working Days = Total Days - (Saturdays + Sundays + Holidays)
+    const officialWorkingDays = data.daysInMonth - (data.weekendCount + data.holidayCount);
+
     const content = `
         <div style="font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif; padding: 20px; color: #000; font-size: 11px; line-height: 1.3;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
@@ -54,7 +57,7 @@ export function generatePDF(data, rows, name, epf) {
                     <div style="display: table-row;">
                         <div style="display: table-cell; width: 220px; padding: 3px 0;">NO. OF WORKING DAYS IN THE MONTH</div>
                         <div style="display: table-cell; width: 20px;">-</div>
-                        <div style="display: table-cell; padding-left: 15px;">${data.workingDays}</div>
+                        <div style="display: table-cell; padding-left: 15px;">${officialWorkingDays}</div>
                     </div>
                     <div style="display: table-row;">
                         <div style="display: table-cell; padding: 3px 0;">NO. OF LEAVES TAKEN</div>
