@@ -3,188 +3,282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | CIC Livestock</title>
+    <title>Admin Dashboard | CIC OT System</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <script type="module">
         import { db, auth } from './firebase-config.js';
         import { initAuth, logout } from './auth.js';
         import { calculateRow } from './calculator.js';
-        import { collection, query, getDocs, doc, getDoc, setDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { generateAdminPDF } from './admin-report.js';
+        import { doc, setDoc, getDoc, collection, getDocs, query } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allUsers = [];
-        let selectedUserId = null;
+        let systemHolidays = [];
 
-        initAuth(async (user) => {
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-            if (userDoc.exists() && userDoc.data().isAdmin) {
-                document.getElementById('adminContent').classList.remove('hidden');
-                loadDashboard();
-            } else {
-                alert("Access Denied! Admins only.");
-                logout();
-            }
-        }, () => { window.location.href = "index.html"; });
+        initAuth(
+            async (user) => {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (!userDoc.exists() || !userDoc.data().isAdmin) {
+                    alert("Unauthorized Access!");
+                    window.location.href = "index.html";
+                    return;
+                }
+                document.getElementById('adminScreen').classList.remove('hidden');
+                await loadAdminData();
+            },
+            () => { window.location.href = "index.html"; }
+        );
 
-        async function loadDashboard() {
-            await fetchUsers();
-            await loadSummary();
-            await loadLogs();
+        async function loadAdminData() {
+            // Fetch All Users/Employees
+            const usersSnap = await getDocs(collection(db, "users"));
+            allUsers = [];
+            usersSnap.forEach(doc => {
+                const d = doc.data();
+                if(!d.isAdmin) {
+                    allUsers.push({ id: doc.id, email: d.email, epf: d.epf || "-", name: d.name || d.email.split('@')[0] });
+                }
+            });
+            
+            // Sort by EPF
+            allUsers.sort((a, b) => a.epf.localeCompare(b.epf));
+
+            renderEmployeeList();
+            renderReportUserSelection();
         }
 
-        async function fetchUsers() {
-            const snap = await getDocs(collection(db, "users"));
-            allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            const list = document.getElementById('userList');
-            list.innerHTML = allUsers.map(u => `
-                <div onclick="viewUserSheet('${u.id}')" class="flex justify-between items-center p-3 bg-slate-50 rounded-xl mb-2 border text-[10px] cursor-pointer hover:bg-blue-50 transition-colors">
-                    <span class="font-bold truncate w-32 uppercase">${u.email.split('@')[0]}</span>
-                    <span class="${u.isAdmin ? 'text-green-600' : 'text-slate-400'} font-black italic">${u.isAdmin ? 'ADMIN' : 'USER'}</span>
+        // Section Navigation
+        window.switchSection = (sectionId) => {
+            ['reportSection', 'employeeSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
+        };
+
+        // 1. Employee Management Logic
+        window.saveEmployeeDetails = async () => {
+            const epf = document.getElementById('empEpf').value.trim();
+            const name = document.getElementById('empName').value.trim();
+            const email = document.getElementById('empEmail').value.trim().toLowerCase();
+
+            if(!epf || !name || !email) return alert("Please fill all fields!");
+
+            // Create or update employee profile mapping via email hash/id or text search match
+            // For stability, we look up if user already exists or we pre-save their details
+            // We use email prefix or a specific doc to map employee info
+            const q = query(collection(db, "users"));
+            const snap = await getDocs(q);
+            let foundUid = null;
+            
+            snap.forEach(dDoc => {
+                if(dDoc.data().email && dDoc.data().email.toLowerCase() === email) foundUid = dDoc.id;
+            });
+
+            if(foundUid) {
+                await setDoc(doc(db, "users", foundUid), { epf: epf, name: name }, { merge: true });
+                alert("Employee details updated successfully!");
+            } else {
+                // If user hasn't registered yet, we can register temporary block or wait. 
+                // Best practice: Save in a separate master info or merge when they register.
+                // Let's create/merge based on matching or create a placeholder
+                alert("Note: This email is not registered in the system yet. Profile mapped for future registration.");
+                // Placeholder creation
+                const pseudoUid = email.replace(/[^a-zA-Z0-9]/g, "_");
+                await setDoc(doc(db, "users", pseudoUid), { email: email, epf: epf, name: name, isAdmin: false }, { merge: true });
+            }
+
+            document.getElementById('empEpf').value = "";
+            document.getElementById('empName').value = "";
+            document.getElementById('empEmail').value = "";
+            await loadAdminData();
+        };
+
+        function renderEmployeeList() {
+            const container = document.getElementById('employeeListContainer');
+            container.innerHTML = allUsers.map(u => `
+                <div class="flex justify-between items-center p-3 bg-slate-50 border rounded-xl text-xs font-bold">
+                    <div>
+                        <span class="text-blue-600 font-black">[EPF: ${u.epf}]</span> ${u.name.toUpperCase()}
+                        <p class="text-[10px] text-slate-400 font-normal">${u.email}</p>
+                    </div>
                 </div>
+            `).join('') || `<p class="text-slate-400 text-center text-[10px]">No employees found.</p>`;
+        }
+
+        // 2. Report User Selection
+        function renderReportUserSelection() {
+            const container = document.getElementById('userCheckboxContainer');
+            container.innerHTML = allUsers.map(u => `
+                <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
+                    <input type="checkbox" value="${u.id}" class="emp-checkbox w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
+                    <div class="text-xs font-bold">
+                        <span class="text-slate-500">[${u.epf}]</span> ${u.name.toUpperCase()}
+                    </div>
+                </label>
             `).join('');
         }
 
-        window.viewUserSheet = async (uid) => {
-            selectedUserId = uid;
-            const user = allUsers.find(u => u.id === uid);
-            document.getElementById('selectedUserName').innerText = `Editing: ${user.email.split('@')[0].toUpperCase()}`;
-            loadSummary();
-        };
-
-        window.updateUserCell = async (day, field, value) => {
-            if (!selectedUserId) return;
-            const month = document.getElementById('monthFilter').value;
-            const year = document.getElementById('yearFilter').value;
-            const monthId = `${year}-${parseInt(month) + 1}`;
+        // 3. Calculation & Bulk PDF Generation
+        window.generateMonthlySummaryReport = async () => {
+            const year = document.getElementById('repYear').value;
+            const monthVal = parseInt(document.getElementById('repMonth').value);
+            const monthName = document.getElementById('repMonth').options[document.getElementById('repMonth').selectedIndex].text;
             
-            const docRef = doc(db, "users", selectedUserId, "months", monthId);
-            const docSnap = await getDoc(docRef);
-            let data = docSnap.exists() ? docSnap.data() : {};
-            if(!data[day]) data[day] = { in: "00:00", out: "00:00", isNextDay: false };
-            
-            if (field === 'isNextDay') data[day][field] = value === 'true';
-            else data[day][field] = value;
+            const checkedBoxes = document.querySelectorAll('.emp-checkbox:checked');
+            if(checkedBoxes.length === 0) return alert("Please select at least one employee!");
 
-            await setDoc(docRef, data, { merge: true });
-            loadSummary();
-        };
+            document.getElementById('loadingOverlay').classList.remove('hidden');
 
-        async function loadSummary() {
-            const month = document.getElementById('monthFilter').value;
-            const year = document.getElementById('yearFilter').value;
-            const monthId = `${year}-${parseInt(month) + 1}`;
-            const container = document.getElementById('summaryTable');
-            container.innerHTML = "<p class='text-center p-10 font-bold animate-pulse'>Crunching Numbers...</p>";
+            const monthId = `${year}-${monthVal + 1}`;
+            const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
 
-            let html = `<table class="w-full text-[10px]"><thead class="border-b text-slate-400 uppercase font-black"><tr class="text-left"><th class="pb-2">User / Details</th><th>N-OT</th><th>S-OT</th><th>Lieu</th></tr></thead><tbody>`;
+            // Load Global Holidays List for verification
+            const holSnap = await getDocs(collection(db, "users")); 
+            // In your schema, holidays are per-user or global. We will check each user's data dynamically.
 
-            for (const u of allUsers) {
-                const isSelected = selectedUserId === u.id;
-                const monthSnap = await getDoc(doc(db, "users", u.id, "months", monthId));
-                const leaveSnap = await getDoc(doc(db, "users", u.id, "leaves", monthId));
-                const holidaySnap = await getDocs(collection(db, "users", u.id, "holidays"));
+            let reportRows = [];
+
+            for(let box of checkedBoxes) {
+                const uid = box.value;
+                const userObj = allUsers.find(u => u.id === uid);
                 
-                const savedData = monthSnap.exists() ? monthSnap.data() : {};
-                const userLeaves = leaveSnap.exists() ? leaveSnap.data() : {};
-                const userHolidays = holidaySnap.docs.map(d => d.id);
-                
-                let tNOT = 0, tSOT = 0, tLieu = 0, tWorked = 0, deductions = 0;
-                const daysInMonth = new Date(year, parseInt(month) + 1, 0).getDate();
-                let lastFull = false;
+                // Fetch Month Attendance Data
+                const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
+                const attendance = mSnap.exists() ? mSnap.data() : {};
 
-                let userRowsHtml = "";
+                // Fetch User Holidays
+                const holQuery = await getDocs(collection(db, "users", uid, "holidays"));
+                const userHolidays = holQuery.docs.map(d => d.id);
+
+                // Fetch User Leaves
+                const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
+                const userLeaves = levSnap.exists() ? levSnap.data() : {};
+
+                // Run Month Processing Logic
+                let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
+                let lastDayWasFullShift = false;
 
                 for (let d = 1; d <= daysInMonth; d++) {
-                    const dateObj = new Date(year, month, d);
-                    const dayData = savedData[d] || { in: "00:00", out: "00:00", isNextDay: false };
-                    const res = calculateRow(dayData.in, dayData.out, userHolidays.includes(dateObj.toLocaleDateString('en-CA')), dateObj.getDay(), dayData.isNextDay, lastFull, userLeaves[d], d === daysInMonth);
-                    
-                    if ((dateObj.getDay() === 0 || userHolidays.includes(dateObj.toLocaleDateString('en-CA'))) && res.worked >= 9) tLieu++;
-                    if (dateObj.getDay() === 0 || userHolidays.includes(dateObj.toLocaleDateString('en-CA'))) tSOT += res.worked; else tWorked += res.worked;
+                    const dateObj = new Date(year, monthVal, d);
+                    const dayOfWeek = dateObj.getDay();
+                    const isoDate = dateObj.toLocaleDateString('en-CA');
+                    const isHoliday = userHolidays.includes(isoDate);
+                    const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
+                    const leaveData = userLeaves[d];
 
-                    if (dateObj.getDay() === 0 || dateObj.getDay() === 6 || userHolidays.includes(dateObj.toLocaleDateString('en-CA'))) deductions += 1;
-                    else if (userLeaves[d]) {
-                        if (userLeaves[d].type === "Full Leave" || userLeaves[d].type === "Lieu Leave") deductions += 1;
-                        else if (userLeaves[d].type === "Half Day") deductions += 0.5;
-                    }
-                    lastFull = res.isFullDay;
+                    const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                    if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
+                    lastDayWasFullShift = res.isFullDay;
 
-                    if (isSelected) {
-                        userRowsHtml += `
-                            <tr class="bg-blue-50/50 border-b text-[9px]">
-                                <td class="py-1 pl-4">Day ${d}</td>
-                                <td colspan="3" class="py-1">
-                                    <div class="flex gap-2">
-                                        <input type="time" value="${dayData.in}" onchange="updateUserCell('${d}', 'in', this.value)" class="border rounded p-0.5">
-                                        <input type="time" value="${dayData.out}" onchange="updateUserCell('${d}', 'out', this.value)" class="border rounded p-0.5">
-                                        <label class="flex items-center gap-1"><input type="checkbox" ${dayData.isNextDay ? 'checked' : ''} onchange="updateUserCell('${d}', 'isNextDay', this.checked.toString())"> <span class="text-[8px]">NextDay</span></label>
-                                    </div>
-                                </td>
-                            </tr>`;
+                    if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
+                    else tNormalHrs += res.worked;
+
+                    if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) {
+                        deductionDays += 1;
+                    } else if (leaveData) {
+                        if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
+                        else if (leaveData.type === "Half Day") deductionDays += 0.5;
                     }
                 }
-                const sWork = (daysInMonth - deductions) * 9;
-                html += `
-                    <tr class="border-b font-bold ${isSelected ? 'bg-blue-100' : ''}">
-                        <td onclick="viewUserSheet('${u.id}')" class="py-3 text-blue-600 truncate cursor-pointer">${u.email.split('@')[0].toUpperCase()}</td>
-                        <td>${Math.max(0, tWorked - sWork).toFixed(1)}</td>
-                        <td>${tSOT.toFixed(1)}</td>
-                        <td class="text-orange-500">${tLieu}</td>
-                    </tr>
-                    ${isSelected ? userRowsHtml : ''}
-                `;
+
+                const tShouldWork = (daysInMonth - deductionDays) * 9;
+                const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
+                
+                // Calculate No-Pay Days / Leaves count 
+                let noPayCount = 0;
+                Object.values(userLeaves).forEach(l => {
+                    if(l.type === "Full Leave") noPayCount += 1;
+                    if(l.type === "Half Day") noPayCount += 0.5;
+                });
+
+                reportRows.push({
+                    epf: userObj.epf,
+                    name: userObj.name,
+                    normalOT: tNormalOT,
+                    specialOT: tSpecialOT,
+                    lieuDays: tLieuDays,
+                    noPayDays: noPayCount
+                });
             }
-            container.innerHTML = html + `</tbody></table>`;
-        }
 
-        async function loadLogs() {
-            const q = query(collection(db, "logs"), orderBy("time", "desc"), limit(8));
-            const snap = await getDocs(q);
-            document.getElementById('logList').innerHTML = snap.docs.map(d => `<div class="text-[9px] py-1 border-b flex justify-between uppercase font-bold text-slate-500"><span>${d.data().user.split('@')[0]}</span><span>${new Date(d.data().time).toLocaleTimeString()}</span></div>`).join('');
-        }
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            
+            // Trigger PDF Generation
+            generateAdminPDF({ year, monthName, rows: reportRows });
+        };
 
-        window.loadSummary = loadSummary;
         window.logout = logout;
     </script>
 </head>
-<body class="bg-slate-100 min-h-screen font-sans">
-    <div id="adminContent" class="hidden max-w-4xl mx-auto p-4 md:p-8">
-        <div class="flex justify-between items-center mb-8 bg-white p-4 rounded-3xl border shadow-sm">
+<body class="bg-slate-100 min-h-screen text-slate-900 pb-12 font-sans">
+    
+    <!-- Loading Screen -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center">
+        <div class="bg-white p-6 rounded-2xl font-bold text-xs uppercase tracking-widest text-blue-600 shadow-2xl">
+            Processing Summaries...
+        </div>
+    </div>
+
+    <div id="adminScreen" class="hidden max-w-xl mx-auto p-4">
+        <!-- Header -->
+        <div class="bg-white p-4 rounded-3xl border shadow-sm flex justify-between items-center mb-4">
             <div>
-                <h1 class="text-lg font-black uppercase text-slate-800">Admin <span class="text-blue-600">Dashboard</span></h1>
-                <p id="selectedUserName" class="text-[9px] font-bold text-blue-500 uppercase"></p>
+                <h1 class="text-sm font-black text-slate-800 uppercase tracking-tight">CIC Admin Panel</h1>
+                <p class="text-[10px] text-slate-400 font-bold uppercase">Management & Reports</p>
             </div>
-            <button onclick="logout()" class="bg-red-50 text-red-500 px-5 py-2 rounded-2xl text-[10px] font-black uppercase border border-red-100">Sign Out</button>
+            <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase">Logout</button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="space-y-6">
-                <div class="bg-white p-6 rounded-[2rem] border shadow-sm">
-                    <h2 class="text-[10px] font-black uppercase text-slate-400 mb-4">Users List (Click to Edit)</h2>
-                    <div id="userList"></div>
+        <!-- Navigation Buttons -->
+        <div class="flex gap-2 mb-4">
+            <button onclick="switchSection('reportSection')" class="flex-1 bg-blue-600 text-white p-3 rounded-2xl text-[11px] font-black uppercase shadow-md shadow-blue-200">Reports Section</button>
+            <button onclick="switchSection('employeeSection')" class="flex-1 bg-slate-800 text-white p-3 rounded-2xl text-[11px] font-black uppercase shadow-md">Add Employees</button>
+        </div>
+
+        <!-- 1. REPORTS SECTION -->
+        <div id="reportSection" class="space-y-4">
+            <div class="bg-white p-5 rounded-[2rem] border shadow-sm">
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-4">Select Month & Year</h3>
+                <div class="flex gap-2 mb-4">
+                    <select id="repYear" class="bg-slate-50 border p-3 rounded-xl text-xs flex-1 outline-none font-bold"><option>2026</option></select>
+                    <select id="repMonth" class="bg-slate-50 border p-3 rounded-xl text-xs flex-1 outline-none font-bold">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
                 </div>
-                <div class="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl">
-                    <h2 class="text-[10px] font-black uppercase text-slate-500 mb-4 tracking-widest">Login History</h2>
-                    <div id="logList"></div>
+
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-3">Select Employees for Report</h3>
+                <div id="userCheckboxContainer" class="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto mb-5 p-1 border border-dashed rounded-2xl">
+                    <!-- Checkboxes inject dynamically -->
                 </div>
+
+                <button onclick="generateMonthlySummaryReport()" class="w-full bg-green-500 text-white py-4 rounded-2xl font-black text-xs uppercase shadow-lg shadow-green-100">Generate Summary Report</button>
+            </div>
+        </div>
+
+        <!-- 2. EMPLOYEE MANAGEMENT SECTION -->
+        <div id="employeeSection" class="hidden space-y-4">
+            <div class="bg-white p-5 rounded-[2rem] border shadow-sm">
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-4">Add / Update Employee</h3>
+                <div class="space-y-3 mb-4">
+                    <input type="text" id="empEpf" placeholder="EPF NUMBER" class="w-full p-3.5 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                    <input type="text" id="empName" placeholder="FULL NAME" class="w-full p-3.5 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                    <input type="email" id="empEmail" placeholder="REGISTERED GOOGLE EMAIL" class="w-full p-3.5 bg-slate-50 border rounded-xl text-xs outline-none text-slate-600">
+                </div>
+                <button onclick="saveEmployeeDetails()" class="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-100">Save Employee profile</button>
             </div>
 
-            <div class="md:col-span-2">
-                <div class="bg-white p-6 md:p-10 rounded-[3rem] border shadow-sm min-h-[500px]">
-                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
-                        <h2 class="font-black uppercase text-sm">Monthly Summary Report</h2>
-                        <div class="flex gap-2 w-full sm:w-auto">
-                            <select id="yearFilter" onchange="loadSummary()" class="bg-slate-50 border p-2 rounded-xl text-[10px] font-bold flex-1"><option>2026</option></select>
-                            <select id="monthFilter" onchange="loadSummary()" class="bg-slate-50 border p-2 rounded-xl text-[10px] font-bold flex-1">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id="summaryTable" class="overflow-x-auto"></div>
+            <!-- Employee List -->
+            <div class="bg-white p-5 rounded-[2rem] border shadow-sm">
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-3">System Registered Employees</h3>
+                <div id="employeeListContainer" class="space-y-2 max-h-[250px] overflow-y-auto">
+                    <!-- List items inject dynamically -->
                 </div>
             </div>
         </div>
+
     </div>
 </body>
 </html>
- 
