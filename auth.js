@@ -1,48 +1,46 @@
-import { auth, db } from './firebase-config.js';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { collection, addDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { db, auth } from './firebase-config.js';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-export const initAuth = (onUserIn, onUserOut) => {
-    onAuthStateChanged(auth, (user) => {
-        if (user) onUserIn(user);
-        else onUserOut();
-    });
-};
+// 1. LOGIN FUNCTION (WITH AUTO LOGS)
+export async function login(email, password) {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-export const login = async (email, pass) => {
-    const res = await signInWithEmailAndPassword(auth, email, pass);
-    
-    // Check if admin
-    const userDoc = await getDoc(doc(db, "users", res.user.uid));
-    const isAdmin = userDoc.exists() && userDoc.data().isAdmin;
+    try {
+        // Firestore එකෙන් ලොග් වුණු යූසර්ගෙ ප්‍රොෆයිල් විස්තර ගන්නවා (නම ට්‍රැක් කරන්න)
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const displayName = userDoc.exists() && userDoc.data().name 
+            ? userDoc.data().name 
+            : user.email.split('@')[0].toUpperCase();
 
-    // Login Log ekak add kirima
-    await addDoc(collection(db, "logs"), {
-        user: email,
-        time: new Date().getTime(),
-        status: "success",
-        role: isAdmin ? "admin" : "user"
-    });
-
-    if (isAdmin) {
-        window.location.href = "admin.html";
-    } else {
-        window.location.href = "index.html";
+        // login_logs කන්සෝල් එකට විස්තර ඇතුළත් කිරීම
+        await addDoc(collection(db, "login_logs"), {
+            uid: user.uid,
+            email: user.email,
+            name: displayName,
+            timestamp: serverTimestamp()
+        });
+    } catch (logError) {
+        console.error("Error creating login log: ", logError);
+        // ලොග් එක වැටුණෙ නැතත් යූසර්ගෙ ලොගින් එක බ්ලොක් වෙන්නෙ නැහැ
     }
 
-    return res;
-};
+    return userCredential;
+}
 
-export const signup = async (email, pass) => {
-    const res = await createUserWithEmailAndPassword(auth, email, pass);
-    const user = res.user;
-    // Firestore eke user document eka create kirima
-    await setDoc(doc(db, "users", user.uid), {
-        email: email,
-        isAdmin: false,
-        createdAt: new Date().getTime()
+// 2. LOGOUT FUNCTION
+export async function logout() {
+    return await signOut(auth);
+}
+
+// 3. AUTH STATE INITIALIZATION
+export function initAuth(onLogin, onLogout) {
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            onLogin(user);
+        } else {
+            onLogout();
+        }
     });
-    return res;
-};
-
-export const logout = () => signOut(auth);
+}
