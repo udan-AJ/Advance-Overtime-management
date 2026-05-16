@@ -208,7 +208,7 @@
             let emailVal = document.getElementById('email').value.trim();
             // මෙන්න මෙතනදි 'admin' විතරක් ගැහුවොත් ඔයාගේ admin email එකට auto convert කරනවා
             if(emailVal.toLowerCase() === 'admin') {
-                emailVal = 'admin@cic.com'; // **Oyaage aththa admin email eka meka venuwata danna**
+                emailVal = 'admin@admin.com'; // **Oyaage aththa admin email eka meka venuwata danna**
             }
             login(emailVal, document.getElementById('pass').value).catch(e => alert(e.message));
         };
