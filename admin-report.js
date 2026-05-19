@@ -22,7 +22,7 @@ export function generateAdminPDF(data) {
                 <p style="margin: 4px 0 0 0; font-size: 10px; font-weight: bold;">MONTH: ${data.monthName} ${data.year}</p>
             </div>
 
-            <!-- Main Summary Table (Optimized for Portrait) -->
+            <!-- Main Summary Table -->
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 9.5px; text-align: center; table-layout: fixed;">
                 <thead>
                     <tr style="background: #e5e7eb; font-weight: bold;">
@@ -57,25 +57,11 @@ export function generateAdminPDF(data) {
                 </tbody>
             </table>
 
-            <!-- Signatures Section -->
-            <div style="margin-top: 50px; font-size: 10.5px; font-weight: bold;">
-                <div style="display: table; width: 100%; border-spacing: 0 30px;">
-                    <div style="display: table-row;">
-                        <div style="display: table-cell; width: 150px;">PREPARED BY (ADMIN)</div>
-                        <div style="display: table-cell; width: 15px;">:</div>
-                        <div style="display: table-cell;">............................................................</div>
-                    </div>
-                    <div style="display: table-row;">
-                        <div style="display: table-cell;">CHECKED BY</div>
-                        <div style="display: table-cell;">:</div>
-                        <div style="display: table-cell;">............................................................</div>
-                    </div>
-                    <div style="display: table-row;">
-                        <div style="display: table-cell;">HEAD OF THE DEPT.</div>
-                        <div style="display: table-cell;">:</div>
-                        <div style="display: table-cell;">............................................................</div>
-                    </div>
-                </div>
+            <!-- Dynamic Left-Aligned Single Signature Section -->
+            <div style="margin-top: 60px; font-size: 10px; text-align: left;">
+                <p style="margin: 0 0 4px 0;">............................................................</p>
+                <p style="margin: 0 0 2px 0; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;">${data.hod.name}</p>
+                <p style="margin: 0; font-weight: bold; text-transform: uppercase; color: #444; font-size: 9px;">${data.hod.position}</p>
             </div>
         </div>
     `;
@@ -85,7 +71,7 @@ export function generateAdminPDF(data) {
         filename: `CIC_Monthly_Summary_Report_${data.monthName}_${data.year}.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { scale: 3, useCORS: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } // මෙතන 'portrait' වලට මාරු කළා
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
     };
 
     html2pdf().from(content).set(opt).save();
