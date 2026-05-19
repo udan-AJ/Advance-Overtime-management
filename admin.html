@@ -12,13 +12,15 @@
         import { initAuth, logout } from './auth.js';
         import { calculateRow } from './calculator.js';
         import { generateAdminPDF } from './admin-report.js';
-        import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allUsers = [];
         let selectedUserId = null; 
         let activeTimesheetUid = null; 
         let userHolidays = [];
         let userLeaves = {};
+        let activeNoPayUid = null;
+        let manualNoPays = {};
 
         initAuth(
             async (user) => {
@@ -49,11 +51,12 @@
             renderUserSelector(); 
             renderEmployeeList(); 
             renderReportUserSelection(); 
-            await loadLoginLogs(); // Logs ටික load කරනවා
+            renderNoPayUserSelector();
+            await loadLoginLogs(); 
         }
 
         window.switchSection = async (sectionId) => {
-            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection', 'noPaySection'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
             if(sectionId === 'logSection') {
@@ -67,7 +70,6 @@
             container.innerHTML = "<div class='text-center p-4 text-xs text-slate-400 font-bold uppercase'>Fetching Login History...</div>";
             
             try {
-                // වෙලාව අනුව අන්තිම ලොගින් 10ක් විතරක් Query කරනවා
                 const q = query(collection(db, "login_logs"), orderBy("timestamp", "desc"), limit(10));
                 const snap = await getDocs(q);
                 
@@ -371,17 +373,107 @@
                 const tShouldWork = (daysInMonth - deductionDays) * 9;
                 const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
                 
+                // [MANUAL NO PAY CALCULATION IN SUMMARY REPORT]
                 let noPayCount = 0;
-                Object.values(userLeaves).forEach(l => {
-                    if(l.type === "Full Leave") noPayCount += 1;
-                    if(l.type === "Half Day") noPayCount += 0.5;
-                });
+                const npSnap = await getDoc(doc(db, "users", uid, "manual_nopays", monthId));
+                if(npSnap.exists()) {
+                    const npData = npSnap.data();
+                    Object.values(npData).forEach(val => {
+                        noPayCount += parseFloat(val) || 0;
+                    });
+                }
 
                 reportRows.push({ epf: userObj.epf, name: userObj.name, normalOT: tNormalOT, specialOT: tSpecialOT, lieuDays: tLieuDays, noPayDays: noPayCount });
             }
 
             document.getElementById('loadingOverlay').classList.add('hidden');
             generateAdminPDF({ year, monthName, rows: reportRows });
+        };
+
+        // --- [PART 5: MANUAL NO-PAY ADD/EDIT LOGIC (ALUTH TAB FEATURE)] ---
+        function renderNoPayUserSelector() {
+            const select = document.getElementById('noPayUserSelect');
+            select.innerHTML = `<option value="">-- SELECT EMPLOYEE --</option>` + 
+                allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
+        }
+
+        window.loadSelectedUserNoPay = async () => {
+            activeNoPayUid = document.getElementById('noPayUserSelect').value;
+            if(!activeNoPayUid) {
+                document.getElementById('noPayListContainer').innerHTML = "";
+                return;
+            }
+            await renderNoPayList();
+        };
+
+        async function renderNoPayList() {
+            if(!activeNoPayUid) return;
+            const month = parseInt(document.getElementById('noPayMonthSelect').value) + 1;
+            const year = document.getElementById('noPayYearSelect').value;
+            const monthId = `${year}-${month}`;
+            const container = document.getElementById('noPayListContainer');
+            
+            container.innerHTML = "<div class='p-4 text-center text-slate-400 text-xs font-bold uppercase'>Loading No-Pay Records...</div>";
+            
+            const docSnap = await getDoc(doc(db, "users", activeNoPayUid, "manual_nopays", monthId));
+            manualNoPays = docSnap.exists() ? docSnap.data() : {};
+            
+            container.innerHTML = "";
+            const entries = Object.entries(manualNoPays).sort((a,b) => parseInt(a[0]) - parseInt(b[0]));
+            
+            if(entries.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-center text-[10px] py-4">No manual no-pay records found for this month.</p>`;
+                return;
+            }
+            
+            entries.forEach(([day, value]) => {
+                const logRow = document.createElement('div');
+                logRow.className = "flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold mb-2 shadow-sm";
+                logRow.innerHTML = `
+                    <div>
+                        <span class="text-red-600 font-black uppercase">Day ${day}</span>
+                        <p class="text-[10px] text-slate-400 font-normal">Amount: ${value} Day(s)</p>
+                    </div>
+                    <button onclick="deleteNoPayRecord('${day}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">Delete</button>
+                `;
+                container.appendChild(logRow);
+            });
+        }
+
+        window.saveManualNoPay = async () => {
+            if(!activeNoPayUid) return alert("Please select an employee first!");
+            const dateVal = document.getElementById('noPayDateInput').value;
+            if(!dateVal) return alert("Please select a date!");
+            
+            const amount = parseFloat(document.getElementById('noPayAmountSelect').value);
+            const dObj = new Date(dateVal);
+            const day = dObj.getDate();
+            const monthId = `${dObj.getFullYear()}-${dObj.getMonth() + 1}`;
+            
+            // UI එකේ තියෙන month/year dropdown වලට අදාළ එකමද තෝරලා තියෙන්නේ කියලා Check කිරීම
+            const currentSelMonth = parseInt(document.getElementById('noPayMonthSelect').value) + 1;
+            const currentSelYear = document.getElementById('noPayYearSelect').value;
+            
+            if(`${currentSelYear}-${currentSelMonth}` !== monthId) {
+                return alert("The date selected does not match the chosen Year/Month dropdowns!");
+            }
+            
+            manualNoPays[day] = amount;
+            await setDoc(doc(db, "users", activeNoPayUid, "manual_nopays", monthId), manualNoPays, { merge: true });
+            alert("No-Pay record saved successfully!");
+            await renderNoPayList();
+        };
+
+        window.deleteNoPayRecord = async (day) => {
+            if(!confirm("Are you sure you want to delete this record?")) return;
+            const month = parseInt(document.getElementById('noPayMonthSelect').value) + 1;
+            const year = document.getElementById('noPayYearSelect').value;
+            const monthId = `${year}-${month}`;
+            
+            delete manualNoPays[day];
+            await setDoc(doc(db, "users", activeNoPayUid, "manual_nopays", monthId), manualNoPays);
+            alert("Record deleted!");
+            await renderNoPayList();
         };
 
         window.logout = logout;
@@ -404,12 +496,13 @@
             <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">Logout</button>
         </div>
 
-        <!-- 4 Tab Dynamic Menu Menu System -->
-        <div class="bg-white p-1 rounded-2xl border flex gap-0.5 mb-3 text-center shadow-sm text-[8px] font-black uppercase tracking-wider">
-            <button onclick="switchSection('timesheetSection')" class="flex-1 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
-            <button onclick="switchSection('reportSection')" class="flex-1 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Monthly Report</button>
-            <button onclick="switchSection('employeeSection')" class="flex-1 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
-            <button onclick="switchSection('logSection')" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-blue-600">Logs History</button>
+        <!-- 5 Tab Dynamic Menu System (UPDATED FOR NO-PAY FEATURE) -->
+        <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[8px] font-black uppercase tracking-wider">
+            <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
+            <button onclick="switchSection('reportSection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Monthly Report</button>
+            <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay Entry</button>
+            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
+            <button onclick="switchSection('logSection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl bg-slate-100 text-blue-600">Logs History</button>
         </div>
 
         <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
@@ -454,6 +547,50 @@
             </div>
         </div>
 
+        <!-- SECTION 5: NEW MANUAL NO-PAY MANAGEMENT TAB -->
+        <div id="noPaySection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-red-500 uppercase mb-3">Manual No-Pay Entry Form</h3>
+                
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="noPayYearSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="noPayMonthSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+
+                <select id="noPayUserSelect" onchange="loadSelectedUserNoPay();" class="w-full bg-red-50 text-red-700 border-2 border-red-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
+                    <!-- Dropdown dynamically loads -->
+                </select>
+
+                <div class="grid grid-cols-2 gap-2 mb-3.5">
+                    <div>
+                        <label class="block text-[8px] font-black text-slate-400 uppercase mb-1">Select Date</label>
+                        <input type="date" id="noPayDateInput" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[8px] font-black text-slate-400 uppercase mb-1">No-Pay Type/Value</label>
+                        <select id="noPayAmountSelect" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                            <option value="1.0">FULL DAY (1.0)</option>
+                            <option value="0.5">HALF DAY (0.5)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="saveManualNoPay()" class="w-full bg-red-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm">Save No-Pay Record</button>
+            </div>
+
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">Recorded No-Pay Log for Selected Month</h3>
+                <div id="noPayListContainer" class="max-h-[200px] overflow-y-auto">
+                    <!-- Dynamic List Injects here -->
+                </div>
+            </div>
+        </div>
+
         <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
         <div id="employeeSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
@@ -477,7 +614,7 @@
         </div>
 
         <!-- SECTION 4: LOGIN LOGS HISTORY (ALUTH SECTION) -->
-        <div id="logSection" class="space-y-3">
+        <div id="logSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="text-[10px] font-black text-slate-400 uppercase">Recent System Login Logs</h3>
