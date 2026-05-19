@@ -52,7 +52,7 @@
             renderEmployeeList(); 
             renderReportUserSelection(); 
             renderNoPayUserSelector();
-            await loadHODProfile(); // HOD Profile එක load කිරීම
+            await loadHODProfile(); 
             await loadLoginLogs(); 
         }
 
@@ -238,7 +238,7 @@
             `;    
         }
 
-        // --- [PART 3: EMPLOYEE PROFILE PROFILE ADD / EDIT LOGIC & HOD SETTINGS] ---
+        // --- [PART 3: EMPLOYEE PROFILE & HOD SETTINGS LOGIC] ---
         async function loadHODProfile() {
             const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
             if(hodSnap.exists()) {
@@ -254,8 +254,12 @@
             
             if(!name || !position) return alert("Please fill both Head of Department fields!");
             
-            await setDoc(doc(db, "settings", "hod_profile"), { name, position }, { merge: true });
-            alert("Head of Department profile updated successfully!");
+            try {
+                await setDoc(doc(db, "settings", "hod_profile"), { name, position }, { merge: true });
+                alert("Head of Department profile updated successfully!");
+            } catch(e) {
+                alert("Error updating HOD profile: " + e.message);
+            }
         };
 
         window.saveEmployeeDetails = async () => {
@@ -347,75 +351,85 @@
             if(checkedBoxes.length === 0) return alert("Please select at least one employee!");
 
             document.getElementById('loadingOverlay').classList.remove('hidden');
-            const monthId = `${year}-${monthVal + 1}`;
-            const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
+            
+            try {
+                const monthId = `${year}-${monthVal + 1}`;
+                const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
 
-            let reportRows = [];
+                let reportRows = [];
 
-            for(let box of checkedBoxes) {
-                const uid = box.value;
-                const userObj = allUsers.find(u => u.id === uid);
-                
-                const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
-                const attendance = mSnap.exists() ? mSnap.data() : {};
+                for(let box of checkedBoxes) {
+                    const uid = box.value;
+                    const userObj = allUsers.find(u => u.id === uid);
+                    
+                    const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
+                    const attendance = mSnap.exists() ? mSnap.data() : {};
 
-                const holQuery = await getDocs(collection(db, "users", uid, "holidays"));
-                const userHolidays = holQuery.docs.map(d => d.id);
+                    const holQuery = await getDocs(collection(db, "users", uid, "holidays"));
+                    const userHolidays = holQuery.docs.map(d => d.id);
 
-                const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
-                const userLeaves = levSnap.exists() ? levSnap.data() : {};
+                    const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
+                    const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
-                let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
-                let lastDayWasFullShift = false;
+                    let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
+                    let lastDayWasFullShift = false;
 
-                for (let d = 1; d <= daysInMonth; d++) {
-                    const dateObj = new Date(year, monthVal, d);
-                    const dayOfWeek = dateObj.getDay();
-                    const isoDate = dateObj.toLocaleDateString('en-CA');
-                    const isHoliday = userHolidays.includes(isoDate);
-                    const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
-                    const leaveData = userLeaves[d];
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const dateObj = new Date(year, monthVal, d);
+                        const dayOfWeek = dateObj.getDay();
+                        const isoDate = dateObj.toLocaleDateString('en-CA');
+                        const isHoliday = userHolidays.includes(isoDate);
+                        const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
+                        const leaveData = userLeaves[d];
 
-                    const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
-                    if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
-                    lastDayWasFullShift = res.isFullDay;
+                        const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                        if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
+                        lastDayWasFullShift = res.isFullDay;
 
-                    if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
-                    else tNormalHrs += res.worked;
+                        if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
+                        else tNormalHrs += res.worked;
 
-                    if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
-                    else if (leaveData) {
-                        if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
-                        else if (leaveData.type === "Half Day") deductionDays += 0.5;
+                        if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
+                        else if (leaveData) {
+                            if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
+                            else if (leaveData.type === "Half Day") deductionDays += 0.5;
+                        }
                     }
+
+                    const tShouldWork = (daysInMonth - deductionDays) * 9;
+                    const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
+                    
+                    let noPayCount = 0;
+                    const npSnap = await getDoc(doc(db, "users", uid, "manual_nopays", monthId));
+                    if(npSnap.exists()) {
+                        const npData = npSnap.data();
+                        Object.values(npData).forEach(val => {
+                            noPayCount += parseFloat(val) || 0;
+                        });
+                    }
+
+                    reportRows.push({ epf: userObj.epf, name: userObj.name, normalOT: tNormalOT, specialOT: tSpecialOT, lieuDays: tLieuDays, noPayDays: noPayCount });
                 }
 
-                const tShouldWork = (daysInMonth - deductionDays) * 9;
-                const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
-                
-                let noPayCount = 0;
-                const npSnap = await getDoc(doc(db, "users", uid, "manual_nopays", monthId));
-                if(npSnap.exists()) {
-                    const npData = npSnap.data();
-                    Object.values(npData).forEach(val => {
-                        noPayCount += parseFloat(val) || 0;
-                    });
+                // [UPDATED: EMPLOYEES LA EPF NUMBER PILIWELATA SORT KIRIMA]
+                reportRows.sort((a, b) => {
+                    return String(a.epf).localeCompare(String(b.epf), undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                let hodProfile = { name: "...................................................", position: "HEAD OF THE DEPT." };
+                const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
+                if(hodSnap.exists()) {
+                    const hodData = hodSnap.data();
+                    if(hodData.name) hodProfile.name = hodData.name.toUpperCase();
+                    if(hodData.position) hodProfile.position = hodData.position.toUpperCase();
                 }
 
-                reportRows.push({ epf: userObj.epf, name: userObj.name, normalOT: tNormalOT, specialOT: tSpecialOT, lieuDays: tLieuDays, noPayDays: noPayCount });
+                generateAdminPDF({ year, monthName, rows: reportRows, hod: hodProfile });
+            } catch(error) {
+                alert("Error generating report: " + error.message);
+            } finally {
+                document.getElementById('loadingOverlay').classList.add('hidden');
             }
-
-            // Report එකට HOD Profile විස්තර කියවා ගැනීම
-            let hodProfile = { name: "...................................................", position: "HEAD OF THE DEPT." };
-            const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
-            if(hodSnap.exists()) {
-                const hodData = hodSnap.data();
-                if(hodData.name) hodProfile.name = hodData.name.toUpperCase();
-                if(hodData.position) hodProfile.position = hodData.position.toUpperCase();
-            }
-
-            document.getElementById('loadingOverlay').classList.add('hidden');
-            generateAdminPDF({ year, monthName, rows: reportRows, hod: hodProfile });
         };
 
         // --- [PART 5: MANUAL NO-PAY ADD/EDIT LOGIC] ---
@@ -620,7 +634,7 @@
 
         <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
         <div id="employeeSection" class="hidden space-y-3">
-            <!-- [NEW CARD: HEAD OF THE DEPARTMENT SETTINGS] -->
+            <!-- HEAD OF THE DEPARTMENT SETTINGS CARD -->
             <div class="bg-white p-4 rounded-[2rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/20 to-white">
                 <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3 tracking-wide">Head of the Department Profile</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-3">
