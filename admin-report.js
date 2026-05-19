@@ -5,12 +5,17 @@ export function generateAdminPDF(data) {
     let totalLieu = 0;
     let totalNoPay = 0;
 
-    data.rows.forEach(r => {
-        totalNormalOT += r.normalOT;
-        totalSpecialOT += r.specialOT;
-        totalLieu += r.lieuDays;
-        totalNoPay += r.noPayDays;
-    });
+    if (data.rows && Array.isArray(data.rows)) {
+        data.rows.forEach(r => {
+            totalNormalOT += r.normalOT || 0;
+            totalSpecialOT += r.specialOT || 0;
+            totalLieu += r.lieuDays || 0;
+            totalNoPay += r.noPayDays || 0;
+        });
+    }
+
+    const hName = (data.hod && data.hod.name) ? data.hod.name : "...................................................";
+    const hPos = (data.hod && data.hod.position) ? data.hod.position : "HEAD OF THE DEPT.";
 
     const content = `
         <div style="font-family: 'Trebuchet MS', Arial, sans-serif; padding: 15px; color: #000; font-size: 10.5px; line-height: 1.3;">
@@ -39,10 +44,10 @@ export function generateAdminPDF(data) {
                         <tr>
                             <td style="border: 1px solid #000; padding: 6px 2px; font-weight: bold;">${row.epf}</td>
                             <td style="border: 1px solid #000; padding: 6px 2px; text-align: left; padding-left: 6px; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${row.name}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.normalOT.toFixed(1)}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.specialOT.toFixed(1)}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.lieuDays}</td>
-                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.noPayDays.toFixed(1)}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${(row.normalOT || 0).toFixed(1)}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${(row.specialOT || 0).toFixed(1)}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${row.lieuDays || 0}</td>
+                            <td style="border: 1px solid #000; padding: 6px 2px;">${(row.noPayDays || 0).toFixed(1)}</td>
                         </tr>
                     `).join('')}
                     
@@ -60,8 +65,8 @@ export function generateAdminPDF(data) {
             <!-- Dynamic Left-Aligned Single Signature Section -->
             <div style="margin-top: 60px; font-size: 10px; text-align: left;">
                 <p style="margin: 0 0 4px 0;">............................................................</p>
-                <p style="margin: 0 0 2px 0; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;">${data.hod.name}</p>
-                <p style="margin: 0; font-weight: bold; text-transform: uppercase; color: #444; font-size: 9px;">${data.hod.position}</p>
+                <p style="margin: 0 0 2px 0; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;">${hName}</p>
+                <p style="margin: 0; font-weight: bold; text-transform: uppercase; color: #444; font-size: 9px;">${hPos}</p>
             </div>
         </div>
     `;
