@@ -52,6 +52,7 @@
             renderEmployeeList(); 
             renderReportUserSelection(); 
             renderNoPayUserSelector();
+            await loadHODProfile(); // HOD Profile එක load කිරීම
             await loadLoginLogs(); 
         }
 
@@ -64,7 +65,7 @@
             }
         };
 
-        // --- [PART 1: LOGIN LOGS LOGIC (ALUTH FEATURE)] ---
+        // --- [PART 1: LOGIN LOGS LOGIC] ---
         async function loadLoginLogs() {
             const container = document.getElementById('logListContainer');
             container.innerHTML = "<div class='text-center p-4 text-xs text-slate-400 font-bold uppercase'>Fetching Login History...</div>";
@@ -237,7 +238,26 @@
             `;    
         }
 
-        // --- [PART 3: EMPLOYEE PROFILE PROFILE ADD / EDIT LOGIC] ---
+        // --- [PART 3: EMPLOYEE PROFILE PROFILE ADD / EDIT LOGIC & HOD SETTINGS] ---
+        async function loadHODProfile() {
+            const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
+            if(hodSnap.exists()) {
+                const data = hodSnap.data();
+                document.getElementById('hodName').value = data.name || "";
+                document.getElementById('hodPosition').value = data.position || "";
+            }
+        }
+
+        window.saveHODDetails = async () => {
+            const name = document.getElementById('hodName').value.trim();
+            const position = document.getElementById('hodPosition').value.trim();
+            
+            if(!name || !position) return alert("Please fill both Head of Department fields!");
+            
+            await setDoc(doc(db, "settings", "hod_profile"), { name, position }, { merge: true });
+            alert("Head of Department profile updated successfully!");
+        };
+
         window.saveEmployeeDetails = async () => {
             const epf = document.getElementById('empEpf').value.trim();
             const name = document.getElementById('empName').value.trim();
@@ -373,7 +393,6 @@
                 const tShouldWork = (daysInMonth - deductionDays) * 9;
                 const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
                 
-                // [MANUAL NO PAY CALCULATION IN SUMMARY REPORT]
                 let noPayCount = 0;
                 const npSnap = await getDoc(doc(db, "users", uid, "manual_nopays", monthId));
                 if(npSnap.exists()) {
@@ -386,11 +405,20 @@
                 reportRows.push({ epf: userObj.epf, name: userObj.name, normalOT: tNormalOT, specialOT: tSpecialOT, lieuDays: tLieuDays, noPayDays: noPayCount });
             }
 
+            // Report එකට HOD Profile විස්තර කියවා ගැනීම
+            let hodProfile = { name: "...................................................", position: "HEAD OF THE DEPT." };
+            const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
+            if(hodSnap.exists()) {
+                const hodData = hodSnap.data();
+                if(hodData.name) hodProfile.name = hodData.name.toUpperCase();
+                if(hodData.position) hodProfile.position = hodData.position.toUpperCase();
+            }
+
             document.getElementById('loadingOverlay').classList.add('hidden');
-            generateAdminPDF({ year, monthName, rows: reportRows });
+            generateAdminPDF({ year, monthName, rows: reportRows, hod: hodProfile });
         };
 
-        // --- [PART 5: MANUAL NO-PAY ADD/EDIT LOGIC (ALUTH TAB FEATURE)] ---
+        // --- [PART 5: MANUAL NO-PAY ADD/EDIT LOGIC] ---
         function renderNoPayUserSelector() {
             const select = document.getElementById('noPayUserSelect');
             select.innerHTML = `<option value="">-- SELECT EMPLOYEE --</option>` + 
@@ -450,7 +478,6 @@
             const day = dObj.getDate();
             const monthId = `${dObj.getFullYear()}-${dObj.getMonth() + 1}`;
             
-            // UI එකේ තියෙන month/year dropdown වලට අදාළ එකමද තෝරලා තියෙන්නේ කියලා Check කිරීම
             const currentSelMonth = parseInt(document.getElementById('noPayMonthSelect').value) + 1;
             const currentSelYear = document.getElementById('noPayYearSelect').value;
             
@@ -496,7 +523,7 @@
             <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">Logout</button>
         </div>
 
-        <!-- 5 Tab Dynamic Menu System (UPDATED FOR NO-PAY FEATURE) -->
+        <!-- 5 Tab Dynamic Menu System -->
         <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[8px] font-black uppercase tracking-wider">
             <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
             <button onclick="switchSection('reportSection')" class="flex-1 min-w-[70px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Monthly Report</button>
@@ -547,7 +574,7 @@
             </div>
         </div>
 
-        <!-- SECTION 5: NEW MANUAL NO-PAY MANAGEMENT TAB -->
+        <!-- SECTION 5: MANUAL NO-PAY MANAGEMENT TAB -->
         <div id="noPaySection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-red-500 uppercase mb-3">Manual No-Pay Entry Form</h3>
@@ -593,6 +620,16 @@
 
         <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
         <div id="employeeSection" class="hidden space-y-3">
+            <!-- [NEW CARD: HEAD OF THE DEPARTMENT SETTINGS] -->
+            <div class="bg-white p-4 rounded-[2rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/20 to-white">
+                <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3 tracking-wide">Head of the Department Profile</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-3">
+                    <input type="text" id="hodName" placeholder="FULL NAME (E.G., A.B.C. PERERA)" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                    <input type="text" id="hodPosition" placeholder="POSITION (E.G., QUALITY ASSURANCE MANAGER)" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                </div>
+                <button onclick="saveHODDetails()" class="w-full bg-purple-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm hover:bg-purple-700 transition-all">Update HOD Profile</button>
+            </div>
+
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 id="formTitle" class="text-[10px] font-black text-slate-400 uppercase mb-3">Add New Employee</h3>
                 <div class="space-y-2.5 mb-3">
@@ -605,6 +642,7 @@
                     <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden bg-slate-200 text-slate-600 py-3 px-4 rounded-xl font-bold text-xs uppercase">Cancel</button>
                 </div>
             </div>
+            
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">System Registered Employees</h3>
                 <div id="employeeListContainer" class="space-y-1.5 max-h-[200px] overflow-y-auto">
@@ -613,7 +651,7 @@
             </div>
         </div>
 
-        <!-- SECTION 4: LOGIN LOGS HISTORY (ALUTH SECTION) -->
+        <!-- SECTION 4: LOGIN LOGS HISTORY -->
         <div id="logSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <div class="flex justify-between items-center mb-3">
