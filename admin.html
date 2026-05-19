@@ -65,13 +65,14 @@
             }
         };
 
-        // --- [PART 1: LOGIN LOGS LOGIC] ---
+        // --- [PART 1: LOGIN LOGS LOGIC - UPDATED & FIXED] ---
         async function loadLoginLogs() {
             const container = document.getElementById('logListContainer');
             container.innerHTML = "<div class='text-center p-4 text-xs text-slate-400 font-bold uppercase'>Fetching Login History...</div>";
             
             try {
-                const q = query(collection(db, "login_logs"), orderBy("timestamp", "desc"), limit(10));
+                // Auth.js එකට ගැලපෙන සේ "logs" collection එකෙන් "time" අනුව query කිරීම සකස් කළා
+                const q = query(collection(db, "logs"), orderBy("time", "desc"), limit(10));
                 const snap = await getDocs(q);
                 
                 container.innerHTML = "";
@@ -83,8 +84,8 @@
                 snap.forEach(doc => {
                     const data = doc.data();
                     let formattedTime = "Just Now";
-                    if(data.timestamp) {
-                        const date = data.timestamp.toDate();
+                    if(data.time) {
+                        const date = new Date(data.time);
                         formattedTime = date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' });
                     }
                     
@@ -92,8 +93,8 @@
                     logRow.className = "flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold mb-2 shadow-sm";
                     logRow.innerHTML = `
                         <div>
-                            <span class="text-emerald-600 font-black uppercase">${data.name}</span>
-                            <p class="text-[10px] text-slate-400 font-normal">${data.email}</p>
+                            <span class="text-emerald-600 font-black uppercase">${data.user ? data.user.split('@')[0] : 'USER'}</span>
+                            <p class="text-[10px] text-slate-400 font-normal">${data.user || ''} (${data.role || 'user'})</p>
                         </div>
                         <div class="text-right text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-1 rounded-lg">
                             ${formattedTime}
@@ -102,6 +103,8 @@
                     container.appendChild(logRow);
                 });
             } catch(e) {
+                // සටහන: මුල්ම වතාවේ index error එකක් ආවොත්, browser console එකේ තියෙන ලින්ක් එක ක්ලික් කරලා auto index එක හැදෙන්න දෙන්න.
+                console.error("Firestore error:", e);
                 container.innerHTML = `<p class="text-red-500 text-center text-[10px] py-4">Error loading logs: ${e.message}</p>`;
             }
         }
@@ -411,7 +414,6 @@
                     reportRows.push({ epf: userObj.epf, name: userObj.name, normalOT: tNormalOT, specialOT: tSpecialOT, lieuDays: tLieuDays, noPayDays: noPayCount });
                 }
 
-                // [UPDATED: EMPLOYEES LA EPF NUMBER PILIWELATA SORT KIRIMA]
                 reportRows.sort((a, b) => {
                     return String(a.epf).localeCompare(String(b.epf), undefined, { numeric: true, sensitivity: 'base' });
                 });
