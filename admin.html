@@ -12,7 +12,7 @@
         import { initAuth, logout } from './auth.js';
         import { calculateRow } from './calculator.js';
         import { generateAdminPDF } from './admin-report.js';
-        import { validateMonthSheet } from './validator.js'; // Imported Validator
+        import { validateMonthSheet } from './validator.js';
         import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allUsers = [];
@@ -22,6 +22,11 @@
         let userLeaves = {};
         let activeNoPayUid = null;
         let manualNoPays = {};
+
+        // Config Tab States
+        let activeConfigUid = null;
+        let configHolidays = [];
+        let configLeaves = {};
 
         initAuth(
             async (user) => {
@@ -53,13 +58,14 @@
             renderEmployeeList(); 
             renderReportUserSelection(); 
             renderNoPayUserSelector();
-            renderAuditUserSelector(); // Render new auditor dropdown
+            renderAuditUserSelector(); 
+            renderConfigUserSelector(); // Render new config dropdown
             await loadHODProfile(); 
             await loadLoginLogs(); 
         }
 
         window.switchSection = async (sectionId) => {
-            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection', 'noPaySection', 'auditSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection', 'noPaySection', 'auditSection', 'configSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
             if(sectionId === 'logSection') {
@@ -551,7 +557,6 @@
             const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
             const lList = levSnap.exists() ? levSnap.data() : {};
 
-            // Run validation logic from validator.js
             const results = validateMonthSheet(savedData, hList, lList, daysInMonth, year, month);
 
             container.innerHTML = "";
@@ -578,6 +583,110 @@
             }
         };
 
+        // --- [PART 7: LEAVES & HOLIDAYS MANAGEMENT (CONFIG TAB)] ---
+        function renderConfigUserSelector() {
+            const select = document.getElementById('configUserSelect');
+            select.innerHTML = `<option value="">-- SELECT EMPLOYEE TO CONFIG --</option>` + 
+                allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
+        }
+
+        window.loadSelectedUserConfig = async () => {
+            activeConfigUid = document.getElementById('configUserSelect').value;
+            if(!activeConfigUid) {
+                document.getElementById('configHolidayList').innerHTML = "";
+                document.getElementById('configLeaveList').innerHTML = "";
+                return;
+            }
+            await loadConfigHolidays();
+            await loadConfigLeaves();
+        };
+
+        async function loadConfigHolidays() {
+            const holSnap = await getDocs(collection(db, "users", activeConfigUid, "holidays"));
+            configHolidays = holSnap.docs.map(doc => doc.id);
+            renderConfigHolidayList();
+        }
+
+        async function loadConfigLeaves() {
+            const month = parseInt(document.getElementById('configMonthSelect').value) + 1;
+            const year = document.getElementById('configYearSelect').value;
+            const monthId = `${year}-${month}`;
+            const levSnap = await getDoc(doc(db, "users", activeConfigUid, "leaves", monthId));
+            configLeaves = levSnap.exists() ? levSnap.data() : {};
+            renderConfigLeaveList();
+        }
+
+        window.adminAddHoliday = async () => {
+            if(!activeConfigUid) return alert("Select an employee first!");
+            const d = document.getElementById('configHolidayInput').value;
+            if (!d) return alert("Select a valid date!");
+            await setDoc(doc(db, "users", activeConfigUid, "holidays", d), { active: true });
+            alert("Holiday Added!");
+            await loadConfigHolidays();
+        };
+
+        window.adminRemoveHoliday = async (d) => {
+            if(!confirm("Remove this holiday?")) return;
+            await deleteDoc(doc(db, "users", activeConfigUid, "holidays", d));
+            await loadConfigHolidays();
+        };
+
+        function renderConfigHolidayList() {
+            document.getElementById('configHolidayList').innerHTML = configHolidays.map(d => `
+                <div class="flex justify-between items-center p-2.5 bg-slate-50 border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
+                    <span class="text-slate-700">${d}</span>
+                    <button onclick="adminRemoveHoliday('${d}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2 rounded-lg border">Remove</button>
+                </div>
+            `).join('') || `<p class="text-slate-400 text-center text-[10px] py-2">No Holidays Recorded.</p>`;
+        }
+
+        window.adminSaveLeave = async () => {
+            if(!activeConfigUid) return alert("Select an employee first!");
+            const dt = document.getElementById('configLeaveDate').value;
+            const ty = document.getElementById('configLeaveType').value;
+            const sl = document.getElementById('configLeaveSlot').value;
+            if(!dt) return alert("Select Date");
+            
+            const dObj = new Date(dt);
+            const day = dObj.getDate();
+            const monthId = `${dObj.getFullYear()}-${dObj.getMonth() + 1}`;
+
+            const curMonth = parseInt(document.getElementById('configMonthSelect').value) + 1;
+            const curYear = document.getElementById('configYearSelect').value;
+            if(`${curYear}-${curMonth}` !== monthId) {
+                return alert("Selected leave date does not match Month/Year dropdown choice!");
+            }
+
+            configLeaves[day] = { type: ty, slot: sl };
+            await setDoc(doc(db, "users", activeConfigUid, "leaves", monthId), configLeaves, { merge: true });
+            alert("Leave saved successfully!");
+            await loadConfigLeaves();
+        };
+
+        window.adminDeleteLeave = async (day) => {
+            if(!confirm("Delete this leave record?")) return;
+            const month = parseInt(document.getElementById('configMonthSelect').value) + 1;
+            const year = document.getElementById('configYearSelect').value;
+            const monthId = `${year}-${month}`;
+            
+            delete configLeaves[day];
+            await setDoc(doc(db, "users", activeConfigUid, "leaves", monthId), configLeaves);
+            alert("Leave deleted!");
+            await loadConfigLeaves();
+        };
+
+        function renderConfigLeaveList() {
+            document.getElementById('configLeaveList').innerHTML = Object.entries(configLeaves).map(([day, data]) => `
+                <div class="flex justify-between items-center p-2.5 bg-slate-50 border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
+                    <div>
+                        <span class="text-blue-600 font-black block">Day ${day}</span>
+                        <p class="text-[10px] text-slate-400 font-normal">${data.type} (${data.slot})</p>
+                    </div>
+                    <button onclick="adminDeleteLeave('${day}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2 rounded-lg border">Delete</button>
+                </div>
+            `).join('') || `<p class="text-slate-400 text-center text-[10px] py-2">No Leaves Recorded for this month.</p>`;
+        }
+
         window.logout = logout;
         window.loadLoginLogs = loadLoginLogs;
     </script>
@@ -589,6 +698,7 @@
     </div>
 
     <div id="adminScreen" class="hidden max-w-xl mx-auto p-3">
+        <!-- Header -->
         <div class="bg-white p-4 rounded-3xl border shadow-sm flex justify-between items-center mb-3">
             <div>
                 <h1 class="text-sm font-black text-slate-800 uppercase tracking-tight">CIC Admin Dashboard</h1>
@@ -597,15 +707,18 @@
             <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">Logout</button>
         </div>
 
-        <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[8px] font-black uppercase tracking-wider">
-            <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[65px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
-            <button onclick="switchSection('auditSection')" class="flex-1 min-w-[65px] py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100">Auditor</button>
-            <button onclick="switchSection('reportSection')" class="flex-1 min-w-[65px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Monthly Report</button>
-            <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[65px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay Entry</button>
-            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[65px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
-            <button onclick="switchSection('logSection')" class="flex-1 min-w-[65px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Logs History</button>
+        <!-- 7 Tab Dynamic Menu System -->
+        <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
+            <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
+            <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
+            <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">Manage Config</button>
+            <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
+            <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay</button>
+            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
+            <button onclick="switchSection('logSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Logs</button>
         </div>
 
+        <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
         <div id="timesheetSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">View & Edit Attendance Sheet</h3>
@@ -619,12 +732,14 @@
                     </select>
                 </div>
                 <select id="adminUserSelect" onchange="loadSelectedUserSheet();" class="w-full bg-blue-50 text-blue-700 border-2 border-blue-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
-                    </select>
+                    <!-- Dropdown dynamically loads -->
+                </select>
                 <div id="totalHrs" class="text-slate-400 text-center text-[10px] font-bold uppercase py-2">Select an employee to run summary analysis.</div>
             </div>
             <div id="sheetContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
         </div>
 
+        <!-- SECTION 6: AUTOMATED AUDITOR TAB -->
         <div id="auditSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-emerald-600 uppercase mb-2">Automated Sheet Auditor (Rules Checker)</h3>
@@ -638,12 +753,71 @@
                     </select>
                 </div>
                 <select id="auditUserSelect" onchange="clearAuditView();" class="w-full bg-emerald-50 text-emerald-700 border-2 border-emerald-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
-                    </select>
+                    <!-- Dynamic Loading Dropdown -->
+                </select>
                 <button onclick="runAuditCheck()" class="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-md">Check Sheet Rules</button>
             </div>
             <div id="auditResultContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm max-h-[350px] overflow-y-auto"></div>
         </div>
 
+        <!-- NEW SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
+        <div id="configSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3">Manage Leaves & Holidays For Employees</h3>
+                
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="configYearSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="configMonthSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+
+                <select id="configUserSelect" onchange="loadSelectedUserConfig();" class="w-full bg-purple-50 text-purple-700 border-2 border-purple-200 p-3 rounded-xl text-xs font-black outline-none mb-4">
+                    <!-- Dropdown -->
+                </select>
+
+                <!-- Holiday Form Split -->
+                <div class="border-t pt-3 mb-4">
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Add Custom Holiday</label>
+                    <div class="flex gap-2">
+                        <input type="date" id="configHolidayInput" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none flex-1">
+                        <button onclick="adminAddHoliday()" class="bg-purple-600 text-white px-4 rounded-xl font-black text-xs uppercase shadow-sm">Add</button>
+                    </div>
+                </div>
+
+                <!-- Leave Form Split -->
+                <div class="border-t pt-3">
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Record Approved Employee Leave</label>
+                    <input type="date" id="configLeaveDate" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none mb-2">
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <select id="configLeaveType" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                            <option>Full Leave</option><option>Half Day</option><option>Short Leave</option><option>Lieu Leave</option>
+                        </select>
+                        <select id="configLeaveSlot" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                            <option>Full Day</option><option>Morning</option><option>Evening</option>
+                        </select>
+                    </div>
+                    <button onclick="adminSaveLeave()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm">Save/Update Leave</button>
+                </div>
+            </div>
+
+            <!-- Two Columns for Display Logs -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="bg-white p-4 rounded-[1.5rem] border shadow-sm">
+                    <h4 class="text-[9px] font-black text-slate-400 uppercase mb-2">Active Holidays</h4>
+                    <div id="configHolidayList" class="max-h-[180px] overflow-y-auto pr-1"></div>
+                </div>
+                <div class="bg-white p-4 rounded-[1.5rem] border shadow-sm">
+                    <h4 class="text-[9px] font-black text-slate-400 uppercase mb-2">Active Month Leaves</h4>
+                    <div id="configLeaveList" class="max-h-[180px] overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: BULK MONTHLY REPORT GENERATOR -->
         <div id="reportSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-3">Select Target Month</h3>
@@ -658,11 +832,13 @@
                 </div>
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">Check Employees to include</h3>
                 <div id="userCheckboxContainer" class="grid grid-cols-1 gap-1.5 max-h-[220px] overflow-y-auto mb-4 p-1 border border-dashed rounded-xl">
-                    </div>
+                    <!-- Checkboxes inject dynamically -->
+                </div>
                 <button onclick="generateMonthlySummaryReport()" class="w-full bg-green-500 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-md">Generate Summary Report</button>
             </div>
         </div>
 
+        <!-- SECTION 5: MANUAL NO-PAY MANAGEMENT TAB -->
         <div id="noPaySection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-red-500 uppercase mb-3">Manual No-Pay Entry Form</h3>
@@ -678,7 +854,8 @@
                 </div>
 
                 <select id="noPayUserSelect" onchange="loadSelectedUserNoPay();" class="w-full bg-red-50 text-red-700 border-2 border-red-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
-                    </select>
+                    <!-- Dropdown dynamically loads -->
+                </select>
 
                 <div class="grid grid-cols-2 gap-2 mb-3.5">
                     <div>
@@ -700,10 +877,12 @@
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">Recorded No-Pay Log for Selected Month</h3>
                 <div id="noPayListContainer" class="max-h-[200px] overflow-y-auto">
-                    </div>
+                    <!-- Dynamic List Injects here -->
+                </div>
             </div>
         </div>
 
+        <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
         <div id="employeeSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/20 to-white">
                 <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3 tracking-wide">Head of the Department Profile</h3>
@@ -730,10 +909,12 @@
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">System Registered Employees</h3>
                 <div id="employeeListContainer" class="space-y-1.5 max-h-[200px] overflow-y-auto">
-                    </div>
+                    <!-- List items inject dynamically -->
+                </div>
             </div>
         </div>
 
+        <!-- SECTION 4: LOGIN LOGS HISTORY -->
         <div id="logSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <div class="flex justify-between items-center mb-3">
@@ -741,7 +922,8 @@
                     <button onclick="loadLoginLogs()" class="text-blue-600 text-[9px] font-black uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100">Refresh</button>
                 </div>
                 <div id="logListContainer" class="max-h-[450px] overflow-y-auto pr-1">
-                    </div>
+                    <!-- Log entries inject dynamically -->
+                </div>
             </div>
         </div>
 
