@@ -59,7 +59,7 @@
             renderReportUserSelection(); 
             renderNoPayUserSelector();
             renderAuditUserSelector(); 
-            renderConfigUserSelector(); // Render new config dropdown
+            renderConfigUserSelector(); 
             await loadHODProfile(); 
             await loadLoginLogs(); 
         }
@@ -247,7 +247,7 @@
             `;    
         }
 
-        // --- [PART 3: EMPLOYEE PROFILE & HOD SETTINGS LOGIC] ---
+        // --- [PART 3: EMPLOYEE PROFILE & HOD SETTINGS LOGIC - UPDATED WITH DELETE] ---
         async function loadHODProfile() {
             const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
             if(hodSnap.exists()) {
@@ -311,6 +311,19 @@
             document.getElementById('cancelEditBtn').classList.remove('hidden');
         };
 
+        // NEW: Delete Employee Function
+        window.deleteEmployee = async (id, name) => {
+            if (!confirm(`Are you sure you want to permanently delete ${name.toUpperCase()} from the system?`)) return;
+            try {
+                await deleteDoc(doc(db, "users", id));
+                alert("Employee profile successfully removed from database.");
+                if(selectedUserId === id) cancelEdit();
+                await loadAdminData();
+            } catch (e) {
+                alert("Error deleting employee: " + e.message);
+            }
+        };
+
         window.cancelEdit = () => {
             selectedUserId = null;
             clearEmployeeInputs();
@@ -328,12 +341,15 @@
         function renderEmployeeList() {
             const container = document.getElementById('employeeListContainer');
             container.innerHTML = allUsers.map(u => `
-                <div class="flex justify-between items-center p-2.5 bg-slate-50 border rounded-xl text-xs font-bold mb-1.5">
+                <div class="flex justify-between items-center p-2.5 bg-white border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
                     <div>
                         <span class="text-blue-600 font-black">[EPF: ${u.epf}]</span> ${u.name.toUpperCase()}
-                        <p class="text-[10px] text-slate-400 font-normal">${u.email}</p>
+                        <p class="text-[10px] text-slate-400 font-normal text-slate-500">${u.email}</p>
                     </div>
-                    <button onclick="editEmployee('${u.id}', '${u.epf}', '${u.name}', '${u.email}')" class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border">Edit</button>
+                    <div class="flex gap-1">
+                        <button onclick="editEmployee('${u.id}', '${u.epf}', '${u.name}', '${u.email}')" class="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-100">Edit</button>
+                        <button onclick="deleteEmployee('${u.id}', '${u.name}')" class="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-red-100">Delete</button>
+                    </div>
                 </div>
             `).join('') || `<p class="text-slate-400 text-center text-[10px]">No employees found.</p>`;
         }
@@ -486,7 +502,7 @@
                     </div>
                     <button onclick="deleteNoPayRecord('${day}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">Delete</button>
                 `;
-                container.appendChild(logRow);
+                container.appendChild(row);
             });
         }
 
@@ -711,10 +727,10 @@
         <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
             <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
             <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
-            <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">Manage Config</button>
+            <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Manage Config</button>
             <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
             <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay</button>
-            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
+            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Employees</button>
             <button onclick="switchSection('logSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Logs</button>
         </div>
 
@@ -760,7 +776,7 @@
             <div id="auditResultContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm max-h-[350px] overflow-y-auto"></div>
         </div>
 
-        <!-- NEW SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
+        <!-- SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
         <div id="configSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3">Manage Leaves & Holidays For Employees</h3>
@@ -909,7 +925,7 @@
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">System Registered Employees</h3>
                 <div id="employeeListContainer" class="space-y-1.5 max-h-[200px] overflow-y-auto">
-                    <!-- List items inject dynamically -->
+                    <!-- List items inject dynamically with Edit and Delete controls -->
                 </div>
             </div>
         </div>
