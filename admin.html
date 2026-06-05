@@ -12,6 +12,7 @@
         import { initAuth, logout } from './auth.js';
         import { calculateRow } from './calculator.js';
         import { generateAdminPDF } from './admin-report.js';
+        import { generatePDF } from './report.js'; // Imported user individual report generator
         import { validateMonthSheet } from './validator.js';
         import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -22,6 +23,10 @@
         let userLeaves = {};
         let activeNoPayUid = null;
         let manualNoPays = {};
+        
+        // Report Generation State for Selected User
+        let currentCalcData = {};
+        let currentMonthRows = [];
 
         // Config Tab States
         let activeConfigUid = null;
@@ -115,7 +120,7 @@
             }
         }
 
-        // --- [PART 2: TIMESHEETS DISPLAY & EDIT CONTROLS] ---
+        // --- [PART 2: TIMESHEETS DISPLAY & EDIT CONTROLS - UPDATED WITH PRINT] ---
         function renderUserSelector() {
             const select = document.getElementById('adminUserSelect');
             const currentSelected = select.value;
@@ -168,6 +173,7 @@
             const savedData = docSnap.exists() ? docSnap.data() : {};    
 
             container.innerHTML = "";    
+            currentMonthRows = [];
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
             let lastDayWasFullShift = false;
             let wC = 0, hC = 0, fLC = 0, hDC = 0;
@@ -193,6 +199,17 @@
                 } else if (leaveData) {
                     if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; }
                     else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
+                }
+
+                // Append row format to align with individual pdf generator logic
+                if (res.worked > 0 || leaveData) {
+                    currentMonthRows.push({ 
+                        date: `${year}/${String(month + 1).padStart(2,'0')}/${String(d).padStart(2,'0')}`, 
+                        in: (dayData.in !== "00:00" && dayData.in !== "") ? dayData.in : "-", 
+                        out: (dayData.out !== "00:00" && dayData.out !== "") ? dayData.out : "-", 
+                        worked: res.worked, ot: res.ot, sOT: res.sOT, 
+                        type: dayData.workType || "" 
+                    });
                 }
     
                 const row = document.createElement('div');    
@@ -235,19 +252,33 @@
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
+            
+            // Map calculations to state object
+            currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, workingDays: (daysInMonth - deductionDays), monthId };
 
             document.getElementById('totalHrs').innerHTML = `
-                <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-3 rounded-2xl border font-bold">
+                <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-3 rounded-2xl border font-bold mb-2">
                     <div>Normal Worked: <span class="text-blue-600">${tNormalHrs.toFixed(1)}</span></div>
                     <div>Should Work: <span class="text-slate-700">${tShouldWork.toFixed(1)}</span></div>
                     <div class="text-blue-600">Normal OT: <span class="font-black text-xs">${tNormalOT.toFixed(1)}</span></div>
                     <div class="text-red-500">Special OT: <span class="font-black text-xs">${tSpecialOT.toFixed(1)}</span></div>
-                    <div class="text-purple-600 col-span-2 border-t pt-1 mt-1">Total Lieu Days: <span>${tLieuDays}</span></div>
+                    <div class="text-purple-600 col-span-2 border-t pt-1">Total Lieu Days: <span>${tLieuDays}</span></div>
                 </div>
+                <button onclick="printSelectedUserReport()" class="w-full bg-blue-600 text-white font-black text-xs py-2.5 rounded-xl uppercase shadow-sm tracking-wide border border-blue-700">Print Employee Report (PDF)</button>
             `;    
         }
 
-        // --- [PART 3: EMPLOYEE PROFILE & HOD SETTINGS LOGIC - UPDATED WITH DELETE] ---
+        // Print Individual Employee Report directly from Admin Panel
+        window.printSelectedUserReport = () => {
+            if(!activeTimesheetUid) return;
+            const employee = allUsers.find(u => u.id === activeTimesheetUid);
+            if(!employee) return;
+            
+            // Generate report using the system's exact standard logic
+            generatePDF(currentCalcData, currentMonthRows, employee.name.toUpperCase(), employee.epf, userLeaves);
+        };
+
+        // --- [PART 3: EMPLOYEE PROFILE & HOD SETTINGS LOGIC] ---
         async function loadHODProfile() {
             const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
             if(hodSnap.exists()) {
@@ -311,7 +342,6 @@
             document.getElementById('cancelEditBtn').classList.remove('hidden');
         };
 
-        // NEW: Delete Employee Function
         window.deleteEmployee = async (id, name) => {
             if (!confirm(`Are you sure you want to permanently delete ${name.toUpperCase()} from the system?`)) return;
             try {
@@ -502,7 +532,7 @@
                     </div>
                     <button onclick="deleteNoPayRecord('${day}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">Delete</button>
                 `;
-                container.appendChild(row);
+                container.appendChild(logRow);
             });
         }
 
@@ -725,12 +755,12 @@
 
         <!-- 7 Tab Dynamic Menu System -->
         <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
-            <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Timesheets</button>
+            <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Timesheets</button>
             <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
             <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Manage Config</button>
             <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
             <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay</button>
-            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Employees</button>
+            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
             <button onclick="switchSection('logSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Logs</button>
         </div>
 
