@@ -20,11 +20,11 @@ export function generateAdminPDF(data) {
     const content = `
         <div style="font-family: 'Trebuchet MS', Arial, sans-serif; padding: 15px; color: #000; font-size: 10.5px; line-height: 1.3;">
             <!-- Report Header -->
-            <div style="text-align: left; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 8px;">
+            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 8px;">
                 <h2 style="margin:0; font-size: 16px; font-weight: bold; text-transform: uppercase;">CIC FEEDS (PVT) LTD.</h2>
                 <h3 style="margin:2px 0; font-size: 12px; font-weight: bold; text-transform: uppercase; color: #444;">QUALITY ASSURANCE DEPARTMENT</h3>
                 <h4 style="margin:6px 0 0 0; font-size: 11px; text-decoration: underline; font-weight: bold; text-transform: uppercase;">MONTHLY OVERTIME SUMMARY REPORT</h4>
-                <p style="margin: 4px 0 0 0; font-size: 10px; font-weight: bold;">MONTH: ${data.monthName} ${data.year}</p>
+                <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: bold;">MONTH: ${data.monthName} ${data.year}</p>
             </div>
 
             <!-- Main Summary Table -->
