@@ -125,7 +125,6 @@
             select.innerHTML = options;
             if(currentSelected) select.value = currentSelected;
 
-            // Also update the new weekly user selector
             const weeklySelect = document.getElementById('weeklyUserSelect');
             if(weeklySelect) {
                 const curW = weeklySelect.value;
@@ -278,7 +277,7 @@
             generatePDF(currentCalcData, currentMonthRows, employee.name.toUpperCase(), employee.epf, userLeaves);
         };
 
-        // --- NEW WEEKLY CALCULATION LOGIC ---
+        // --- NEW WEEKLY CALCULATION LOGIC (CALENDAR WEEKS) ---
         window.runWeeklyCheck = async () => {
             const uid = document.getElementById('weeklyUserSelect').value;
             if(!uid) return alert("Please select an employee first!");
@@ -300,17 +299,19 @@
             const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
             const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
-            // Divide month into 7-day chunks
-            let weeks = [ [], [], [], [], [] ];
-            for(let d=1; d<=daysInMonth; d++) {
-                if(d<=7) weeks[0].push(d);
-                else if(d<=14) weeks[1].push(d);
-                else if(d<=21) weeks[2].push(d);
-                else if(d<=28) weeks[3].push(d);
-                else weeks[4].push(d);
+            // Divide month into calendar weeks (Monday to Sunday)
+            let weeks = [];
+            let currentWeek = [];
+            for (let d = 1; d <= daysInMonth; d++) {
+                currentWeek.push(d);
+                const dateObj = new Date(year, month, d);
+                // 0 is Sunday. Close the week on Sunday or if it's the last day of the month
+                if (dateObj.getDay() === 0 || d === daysInMonth) {
+                    weeks.push(currentWeek);
+                    currentWeek = [];
+                }
             }
 
-            // Pre-calculate whole month sequentially to maintain shift continuity logic
             let dailyResults = {};
             let lastDayWasFullShift = false;
 
