@@ -12,7 +12,7 @@
         import { initAuth, logout } from './auth.js';
         import { calculateRow } from './calculator.js';
         import { generateAdminPDF } from './admin-report.js';
-        import { generatePDF } from './report.js'; // Imported user individual report generator
+        import { generatePDF } from './report.js'; 
         import { validateMonthSheet } from './validator.js';
         import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -24,11 +24,9 @@
         let activeNoPayUid = null;
         let manualNoPays = {};
         
-        // Report Generation State for Selected User
         let currentCalcData = {};
         let currentMonthRows = [];
 
-        // Config Tab States
         let activeConfigUid = null;
         let configHolidays = [];
         let configLeaves = {};
@@ -70,7 +68,7 @@
         }
 
         window.switchSection = async (sectionId) => {
-            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection', 'noPaySection', 'auditSection', 'configSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection', 'noPaySection', 'auditSection', 'configSection', 'weeklySection'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
             if(sectionId === 'logSection') {
@@ -78,7 +76,6 @@
             }
         };
 
-        // --- [PART 1: LOGIN LOGS LOGIC] ---
         async function loadLoginLogs() {
             const container = document.getElementById('logListContainer');
             container.innerHTML = "<div class='text-center p-4 text-xs text-slate-400 font-bold uppercase'>Fetching Login History...</div>";
@@ -120,13 +117,21 @@
             }
         }
 
-        // --- [PART 2: TIMESHEETS DISPLAY & EDIT CONTROLS - UPDATED WITH PRINT] ---
         function renderUserSelector() {
             const select = document.getElementById('adminUserSelect');
             const currentSelected = select.value;
-            select.innerHTML = `<option value="">-- SELECT EMPLOYEE --</option>` + 
+            const options = `<option value="">-- SELECT EMPLOYEE --</option>` + 
                 allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
+            select.innerHTML = options;
             if(currentSelected) select.value = currentSelected;
+
+            // Also update the new weekly user selector
+            const weeklySelect = document.getElementById('weeklyUserSelect');
+            if(weeklySelect) {
+                const curW = weeklySelect.value;
+                weeklySelect.innerHTML = options;
+                if(curW) weeklySelect.value = curW;
+            }
         }
 
         window.loadSelectedUserSheet = async () => {
@@ -201,7 +206,6 @@
                     else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
                 }
 
-                // Append row format to align with individual pdf generator logic
                 if (res.worked > 0 || leaveData) {
                     currentMonthRows.push({ 
                         date: `${year}/${String(month + 1).padStart(2,'0')}/${String(d).padStart(2,'0')}`, 
@@ -253,7 +257,6 @@
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
             
-            // Map calculations to state object
             currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, workingDays: (daysInMonth - deductionDays), monthId };
 
             document.getElementById('totalHrs').innerHTML = `
@@ -268,17 +271,128 @@
             `;    
         }
 
-        // Print Individual Employee Report directly from Admin Panel
         window.printSelectedUserReport = () => {
             if(!activeTimesheetUid) return;
             const employee = allUsers.find(u => u.id === activeTimesheetUid);
             if(!employee) return;
-            
-            // Generate report using the system's exact standard logic
             generatePDF(currentCalcData, currentMonthRows, employee.name.toUpperCase(), employee.epf, userLeaves);
         };
 
-        // --- [PART 3: EMPLOYEE PROFILE & HOD SETTINGS LOGIC] ---
+        // --- NEW WEEKLY CALCULATION LOGIC ---
+        window.runWeeklyCheck = async () => {
+            const uid = document.getElementById('weeklyUserSelect').value;
+            if(!uid) return alert("Please select an employee first!");
+
+            const month = parseInt(document.getElementById('weeklyMonth').value);
+            const year = parseInt(document.getElementById('weeklyYear').value);
+            const monthId = `${year}-${month + 1}`;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const container = document.getElementById('weeklyResultContainer');
+
+            container.innerHTML = "<div class='p-6 text-center text-xs font-bold text-slate-400 uppercase tracking-widest'>Calculating Weekly Data...</div>";
+
+            const docSnap = await getDoc(doc(db, "users", uid, "months", monthId));
+            const savedData = docSnap.exists() ? docSnap.data() : {};
+
+            const holSnap = await getDocs(collection(db, "users", uid, "holidays"));
+            const userHolidays = holSnap.docs.map(doc => doc.id);
+
+            const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
+            const userLeaves = levSnap.exists() ? levSnap.data() : {};
+
+            // Divide month into 7-day chunks
+            let weeks = [ [], [], [], [], [] ];
+            for(let d=1; d<=daysInMonth; d++) {
+                if(d<=7) weeks[0].push(d);
+                else if(d<=14) weeks[1].push(d);
+                else if(d<=21) weeks[2].push(d);
+                else if(d<=28) weeks[3].push(d);
+                else weeks[4].push(d);
+            }
+
+            // Pre-calculate whole month sequentially to maintain shift continuity logic
+            let dailyResults = {};
+            let lastDayWasFullShift = false;
+
+            for(let d=1; d<=daysInMonth; d++) {
+                const dateObj = new Date(year, month, d);
+                const dayOfWeek = dateObj.getDay();
+                const isoDate = dateObj.toLocaleDateString('en-CA');
+                const isHoliday = userHolidays.includes(isoDate);
+                const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
+                const leaveData = userLeaves[d];
+
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                lastDayWasFullShift = res.isFullDay;
+
+                let normalWorked = 0;
+                if (!(dayOfWeek === 0 || isHoliday)) {
+                    normalWorked = res.worked;
+                }
+
+                dailyResults[d] = { dayOfWeek, isHoliday, leaveData, normalWorked };
+            }
+
+            container.innerHTML = "";
+
+            weeks.forEach((weekDays, index) => {
+                if(weekDays.length === 0) return;
+
+                let totalDays = weekDays.length;
+                let weekends = 0;
+                let weekdayHolidays = 0;
+                let leaveDeductions = 0;
+                let totalNormalWorked = 0;
+
+                weekDays.forEach(d => {
+                    const info = dailyResults[d];
+                    if (info.dayOfWeek === 0 || info.dayOfWeek === 6) {
+                        weekends += 1;
+                    } else if (info.isHoliday) {
+                        weekdayHolidays += 1;
+                    } else if (info.leaveData) {
+                        if (info.leaveData.type === "Full Leave" || info.leaveData.type === "Lieu Leave") {
+                            leaveDeductions += 1;
+                        } else if (info.leaveData.type === "Half Day") {
+                            leaveDeductions += 0.5;
+                        }
+                    }
+                    totalNormalWorked += info.normalWorked;
+                });
+
+                let requiredWorkingDays = totalDays - weekends - weekdayHolidays - leaveDeductions;
+                let requiredHours = requiredWorkingDays * 9;
+                let difference = totalNormalWorked - requiredHours;
+
+                const card = document.createElement('div');
+                card.className = "bg-white p-4 rounded-[1.5rem] border shadow-sm mb-3";
+                
+                let diffColor = difference >= 0 ? "text-emerald-500" : "text-red-500";
+                let diffText = difference > 0 ? `+${difference.toFixed(1)} Hrs` : `${difference.toFixed(1)} Hrs`;
+                let statusBadge = difference >= 0 ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100";
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-2 border-b pb-2">
+                        <h4 class="font-black text-indigo-600 uppercase text-xs">Week ${index + 1} <span class="text-[9px] text-slate-400">(${weekDays[0]} to ${weekDays[weekDays.length-1]})</span></h4>
+                        <span class="font-black text-[10px] ${diffColor} ${statusBadge} px-2.5 py-1.5 rounded-lg border">${diffText}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-bold text-slate-600">
+                        <div class="flex justify-between"><span>Total Days:</span> <span>${totalDays}</span></div>
+                        <div class="flex justify-between"><span>Weekends:</span> <span class="text-slate-400">-${weekends}</span></div>
+                        <div class="flex justify-between"><span>Holidays (W/D):</span> <span class="text-slate-400">-${weekdayHolidays}</span></div>
+                        <div class="flex justify-between"><span>Leaves:</span> <span class="text-slate-400">-${leaveDeductions}</span></div>
+                        <div class="col-span-2 border-t pt-1.5 mt-1 flex justify-between text-blue-600">
+                            <span>Req. Work (${requiredWorkingDays} Days x 9):</span> <span>${requiredHours} Hrs</span>
+                        </div>
+                        <div class="col-span-2 flex justify-between text-slate-800">
+                            <span>Actual Normal Worked:</span> <span>${totalNormalWorked.toFixed(1)} Hrs</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        };
+
         async function loadHODProfile() {
             const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
             if(hodSnap.exists()) {
@@ -291,9 +405,7 @@
         window.saveHODDetails = async () => {
             const name = document.getElementById('hodName').value.trim();
             const position = document.getElementById('hodPosition').value.trim();
-            
             if(!name || !position) return alert("Please fill both Head of Department fields!");
-            
             try {
                 await setDoc(doc(db, "settings", "hod_profile"), { name, position }, { merge: true });
                 alert("Head of Department profile updated successfully!");
@@ -384,7 +496,6 @@
             `).join('') || `<p class="text-slate-400 text-center text-[10px]">No employees found.</p>`;
         }
 
-        // --- [PART 4: MONTHLY SUMMARY REPORT LOGIC] ---
         function renderReportUserSelection() {
             const container = document.getElementById('userCheckboxContainer');
             container.innerHTML = allUsers.map(u => `
@@ -486,7 +597,6 @@
             }
         };
 
-        // --- [PART 5: MANUAL NO-PAY ADD/EDIT LOGIC] ---
         function renderNoPayUserSelector() {
             const select = document.getElementById('noPayUserSelect');
             select.innerHTML = `<option value="">-- SELECT EMPLOYEE --</option>` + 
@@ -571,7 +681,6 @@
             await renderNoPayList();
         };
 
-        // --- [PART 6: SHEET AUTOMATED AUDITOR LOGIC] ---
         function renderAuditUserSelector() {
             const select = document.getElementById('auditUserSelect');
             select.innerHTML = `<option value="">-- SELECT EMPLOYEE FOR AUDIT --</option>` + 
@@ -629,7 +738,6 @@
             }
         };
 
-        // --- [PART 7: LEAVES & HOLIDAYS MANAGEMENT (CONFIG TAB)] ---
         function renderConfigUserSelector() {
             const select = document.getElementById('configUserSelect');
             select.innerHTML = `<option value="">-- SELECT EMPLOYEE TO CONFIG --</option>` + 
@@ -753,9 +861,10 @@
             <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">Logout</button>
         </div>
 
-        <!-- 7 Tab Dynamic Menu System -->
+        <!-- 8 Tab Dynamic Menu System -->
         <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
             <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Timesheets</button>
+            <button onclick="switchSection('weeklySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-indigo-600">Weekly Check</button>
             <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
             <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Manage Config</button>
             <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
@@ -783,6 +892,27 @@
                 <div id="totalHrs" class="text-slate-400 text-center text-[10px] font-bold uppercase py-2">Select an employee to run summary analysis.</div>
             </div>
             <div id="sheetContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
+        </div>
+
+        <!-- NEW SECTION: WEEKLY TIME CHECK -->
+        <div id="weeklySection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-indigo-600 uppercase mb-3">Weekly Time Check Calculator</h3>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="weeklyYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="weeklyMonth" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+                <select id="weeklyUserSelect" class="w-full bg-indigo-50 text-indigo-700 border-2 border-indigo-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
+                    <!-- Dropdown dynamically loads -->
+                </select>
+                <button onclick="runWeeklyCheck()" class="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-md">Calculate Weekly Time</button>
+            </div>
+            <div id="weeklyResultContainer" class="space-y-1"></div>
         </div>
 
         <!-- SECTION 6: AUTOMATED AUDITOR TAB -->
