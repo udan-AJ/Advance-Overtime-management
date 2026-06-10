@@ -6,7 +6,6 @@
     <title>Admin Dashboard | CIC OT System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <!-- Chart.js Library eka add kala -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module">
@@ -16,7 +15,7 @@
         import { generateAdminPDF } from './admin-report.js';
         import { generatePDF } from './report.js'; 
         import { validateMonthSheet } from './validator.js';
-        import { drawOTChart } from './charts.js'; // Aluth chart file eka import kala
+        import { drawAnalyticsChart } from './charts.js'; 
         import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allUsers = [];
@@ -68,89 +67,160 @@
             renderConfigUserSelector(); 
             await loadHODProfile(); 
             await loadLoginLogs(); 
+            window.toggleChartControls(); // Set initial analytics UI state
         }
 
         window.switchSection = async (sectionId) => {
-            // Analytics section ekath hidden list ekata ekathu kala
             ['timesheetSection', 'weeklySection', 'auditSection', 'configSection', 'reportSection', 'noPaySection', 'employeeSection', 'logSection', 'analyticsSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
             if(sectionId === 'logSection') {
                 await loadLoginLogs();
-            } else if (sectionId === 'analyticsSection') {
-                await loadAnalyticsData();
             }
         };
 
-        // --- NEW ANALYTICS TAB LOGIC ---
-        window.loadAnalyticsData = async () => {
-            const year = parseInt(document.getElementById('chartYear').value);
-            const monthVal = parseInt(document.getElementById('chartMonth').value);
+        // --- DYNAMIC ANALYTICS LOGIC ---
+        window.toggleChartControls = () => {
+            const target = document.getElementById('chartTarget').value;
+            const time = document.getElementById('chartTimeframe').value;
+            
+            document.getElementById('chartEmployeeWrap').classList.toggle('hidden', target === 'all');
+            document.getElementById('chartMonthWrap').classList.toggle('hidden', time === 'yearly');
+            
+            if (target === 'individual' && time === 'monthly') {
+                document.getElementById('chartMetricWrap').classList.add('hidden'); // We will show all 4 metrics
+            } else {
+                document.getElementById('chartMetricWrap').classList.remove('hidden');
+            }
+        };
+
+        async function fetchUserHolidays(uid) {
+            const snap = await getDocs(collection(db, "users", uid, "holidays"));
+            return snap.docs.map(d => d.id);
+        }
+
+        async function getUserMonthStats(uid, year, monthVal, userHols) {
             const monthId = `${year}-${monthVal + 1}`;
             const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
-            const containerMsg = document.getElementById('chartMessage');
 
-            containerMsg.innerHTML = "Fetching Data for Chart...";
-            containerMsg.classList.remove('hidden');
-            document.getElementById('otChart').classList.add('hidden');
+            const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
+            const attendance = mSnap.exists() ? mSnap.data() : {};
 
-            let employeeNames = [];
-            let employeeOTHrs = [];
+            const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
+            const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
-            for (let userObj of allUsers) {
-                const uid = userObj.id;
-                const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
-                const attendance = mSnap.exists() ? mSnap.data() : {};
+            let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
+            let lastDayWasFullShift = false;
 
-                const holQuery = await getDocs(collection(db, "users", uid, "holidays"));
-                const userHolidays = holQuery.docs.map(d => d.id);
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateObj = new Date(year, monthVal, d);
+                const dayOfWeek = dateObj.getDay();
+                const isoDate = dateObj.toLocaleDateString('en-CA');
+                const isHoliday = userHols.includes(isoDate);
+                const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
+                const leaveData = userLeaves[d];
 
-                const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
-                const userLeaves = levSnap.exists() ? levSnap.data() : {};
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                lastDayWasFullShift = res.isFullDay;
 
-                let tNormalHrs = 0;
-                let deductionDays = 0;
-                let lastDayWasFullShift = false;
+                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
+                
+                if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
+                else tNormalHrs += res.worked;
 
-                for (let d = 1; d <= daysInMonth; d++) {
-                    const dateObj = new Date(year, monthVal, d);
-                    const dayOfWeek = dateObj.getDay();
-                    const isoDate = dateObj.toLocaleDateString('en-CA');
-                    const isHoliday = userHolidays.includes(isoDate);
-                    const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
-                    const leaveData = userLeaves[d];
-
-                    const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
-                    lastDayWasFullShift = res.isFullDay;
-
-                    if (dayOfWeek !== 0 && !isHoliday) {
-                        tNormalHrs += res.worked;
-                    }
-
-                    if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
-                    else if (leaveData) {
-                        if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
-                        else if (leaveData.type === "Half Day") deductionDays += 0.5;
-                    }
-                }
-
-                const tShouldWork = (daysInMonth - deductionDays) * 9;
-                const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
-
-                // Add to chart arrays if they worked
-                if (tNormalOT > 0 || tNormalHrs > 0) {
-                    employeeNames.push(userObj.name.toUpperCase().split(' ')[0]); // Show first name to save space
-                    employeeOTHrs.push(parseFloat(tNormalOT.toFixed(1)));
+                if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
+                else if (leaveData) {
+                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
+                    else if (leaveData.type === "Half Day") deductionDays += 0.5;
                 }
             }
 
-            if(employeeNames.length === 0) {
-                containerMsg.innerHTML = "No OT data available for this month.";
-            } else {
+            const tShouldWork = (daysInMonth - deductionDays) * 9;
+            const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
+
+            let noPayCount = 0;
+            const npSnap = await getDoc(doc(db, "users", uid, "manual_nopays", monthId));
+            if(npSnap.exists()) {
+                Object.values(npSnap.data()).forEach(val => noPayCount += parseFloat(val) || 0);
+            }
+
+            return {
+                normal: parseFloat(tNormalOT.toFixed(1)),
+                special: parseFloat(tSpecialOT.toFixed(1)),
+                lieu: tLieuDays,
+                nopay: noPayCount
+            };
+        }
+
+        window.loadAnalyticsData = async () => {
+            const target = document.getElementById('chartTarget').value;
+            const time = document.getElementById('chartTimeframe').value;
+            const metric = document.getElementById('chartMetric').value;
+            const year = parseInt(document.getElementById('chartYear').value);
+            const monthVal = parseInt(document.getElementById('chartMonth').value);
+            const metricNames = { 'normal': 'Normal OT', 'special': 'Special OT', 'lieu': 'Lieu Days', 'nopay': 'No-Pay Days' };
+
+            const containerMsg = document.getElementById('chartMessage');
+            containerMsg.innerHTML = "Fetching & Calculating Data... Please Wait.";
+            containerMsg.classList.remove('hidden');
+            document.getElementById('otChart').classList.add('hidden');
+
+            let labels = [];
+            let dataPoints = [];
+            let chartTitle = "";
+
+            try {
+                if (target === 'all' && time === 'monthly') {
+                    chartTitle = `${metricNames[metric]} - All Employees (${year}/${monthVal + 1})`;
+                    for (let u of allUsers) {
+                        const hols = await fetchUserHolidays(u.id);
+                        const stats = await getUserMonthStats(u.id, year, monthVal, hols);
+                        labels.push(u.name.split(' ')[0]);
+                        dataPoints.push(stats[metric]);
+                    }
+                } 
+                else if (target === 'all' && time === 'yearly') {
+                    chartTitle = `${metricNames[metric]} - All Employees (${year} Total)`;
+                    for (let u of allUsers) {
+                        const hols = await fetchUserHolidays(u.id);
+                        let yearlySum = 0;
+                        for (let m = 0; m < 12; m++) {
+                            const stats = await getUserMonthStats(u.id, year, m, hols);
+                            yearlySum += stats[metric];
+                        }
+                        labels.push(u.name.split(' ')[0]);
+                        dataPoints.push(parseFloat(yearlySum.toFixed(1)));
+                    }
+                } 
+                else if (target === 'individual') {
+                    const uid = document.getElementById('chartUserSelect').value;
+                    if(!uid) return alert("Select an employee!");
+                    const uObj = allUsers.find(x => x.id === uid);
+                    const hols = await fetchUserHolidays(uid);
+
+                    if (time === 'monthly') {
+                        // Show all 4 metrics for 1 employee
+                        chartTitle = `${uObj.name.split(' ')[0]}'s Profile Summary (${year}/${monthVal + 1})`;
+                        const stats = await getUserMonthStats(uid, year, monthVal, hols);
+                        labels = ['Normal OT', 'Special OT', 'Lieu Days', 'No-Pay'];
+                        dataPoints = [stats.normal, stats.special, stats.lieu, stats.nopay];
+                    } 
+                    else {
+                        // Yearly for 1 employee
+                        chartTitle = `${uObj.name.split(' ')[0]}'s ${metricNames[metric]} (${year})`;
+                        labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        for (let m = 0; m < 12; m++) {
+                            const stats = await getUserMonthStats(uid, year, m, hols);
+                            dataPoints.push(stats[metric]);
+                        }
+                    }
+                }
+
                 containerMsg.classList.add('hidden');
                 document.getElementById('otChart').classList.remove('hidden');
-                // Call external charts.js function
-                drawOTChart('otChart', employeeNames, employeeOTHrs);
+                drawAnalyticsChart('otChart', 'bar', labels, chartTitle, dataPoints);
+            } catch (e) {
+                containerMsg.innerHTML = "Error generating chart: " + e.message;
             }
         };
 
@@ -196,19 +266,17 @@
         }
 
         function renderUserSelector() {
-            const select = document.getElementById('adminUserSelect');
-            const currentSelected = select.value;
             const options = `<option value="">-- SELECT EMPLOYEE --</option>` + 
                 allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
-            select.innerHTML = options;
-            if(currentSelected) select.value = currentSelected;
-
-            const weeklySelect = document.getElementById('weeklyUserSelect');
-            if(weeklySelect) {
-                const curW = weeklySelect.value;
-                weeklySelect.innerHTML = options;
-                if(curW) weeklySelect.value = curW;
-            }
+            
+            ['adminUserSelect', 'weeklyUserSelect', 'auditUserSelect', 'configUserSelect', 'noPayUserSelect', 'chartUserSelect'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    const val = el.value;
+                    el.innerHTML = options;
+                    if(val) el.value = val;
+                }
+            });
         }
 
         window.loadSelectedUserSheet = async () => {
@@ -595,67 +663,25 @@
             document.getElementById('loadingOverlay').classList.remove('hidden');
             
             try {
-                const monthId = `${year}-${monthVal + 1}`;
-                const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
-
                 let reportRows = [];
 
                 for(let box of checkedBoxes) {
                     const uid = box.value;
                     const userObj = allUsers.find(u => u.id === uid);
+                    const hols = await fetchUserHolidays(uid);
+                    const stats = await getUserMonthStats(uid, year, monthVal, hols);
                     
-                    const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
-                    const attendance = mSnap.exists() ? mSnap.data() : {};
-
-                    const holQuery = await getDocs(collection(db, "users", uid, "holidays"));
-                    const userHolidays = holQuery.docs.map(d => d.id);
-
-                    const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
-                    const userLeaves = levSnap.exists() ? levSnap.data() : {};
-
-                    let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
-                    let lastDayWasFullShift = false;
-
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        const dateObj = new Date(year, monthVal, d);
-                        const dayOfWeek = dateObj.getDay();
-                        const isoDate = dateObj.toLocaleDateString('en-CA');
-                        const isHoliday = userHolidays.includes(isoDate);
-                        const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
-                        const leaveData = userLeaves[d];
-
-                        const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
-                        if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
-                        lastDayWasFullShift = res.isFullDay;
-
-                        if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
-                        else tNormalHrs += res.worked;
-
-                        if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
-                        else if (leaveData) {
-                            if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
-                            else if (leaveData.type === "Half Day") deductionDays += 0.5;
-                        }
-                    }
-
-                    const tShouldWork = (daysInMonth - deductionDays) * 9;
-                    const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
-                    
-                    let noPayCount = 0;
-                    const npSnap = await getDoc(doc(db, "users", uid, "manual_nopays", monthId));
-                    if(npSnap.exists()) {
-                        const npData = npSnap.data();
-                        Object.values(npData).forEach(val => {
-                            noPayCount += parseFloat(val) || 0;
-                        });
-                    }
-
-                    reportRows.push({ epf: userObj.epf, name: userObj.name, normalOT: tNormalOT, specialOT: tSpecialOT, lieuDays: tLieuDays, noPayDays: noPayCount });
+                    reportRows.push({ 
+                        epf: userObj.epf, 
+                        name: userObj.name, 
+                        normalOT: stats.normal, 
+                        specialOT: stats.special, 
+                        lieuDays: stats.lieu, 
+                        noPayDays: stats.nopay 
+                    });
                 }
 
-                reportRows.sort((a, b) => {
-                    return String(a.epf).localeCompare(String(b.epf), undefined, { numeric: true, sensitivity: 'base' });
-                });
+                reportRows.sort((a, b) => String(a.epf).localeCompare(String(b.epf), undefined, { numeric: true, sensitivity: 'base' }));
 
                 let hodProfile = { name: "...................................................", position: "HEAD OF THE DEPT." };
                 const hodSnap = await getDoc(doc(db, "settings", "hod_profile"));
@@ -672,12 +698,6 @@
                 document.getElementById('loadingOverlay').classList.add('hidden');
             }
         };
-
-        function renderNoPayUserSelector() {
-            const select = document.getElementById('noPayUserSelect');
-            select.innerHTML = `<option value="">-- SELECT EMPLOYEE --</option>` + 
-                allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
-        }
 
         window.loadSelectedUserNoPay = async () => {
             activeNoPayUid = document.getElementById('noPayUserSelect').value;
@@ -757,12 +777,6 @@
             await renderNoPayList();
         };
 
-        function renderAuditUserSelector() {
-            const select = document.getElementById('auditUserSelect');
-            select.innerHTML = `<option value="">-- SELECT EMPLOYEE FOR AUDIT --</option>` + 
-                allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
-        }
-
         window.clearAuditView = () => {
             document.getElementById('auditResultContainer').innerHTML = "";
         };
@@ -782,9 +796,7 @@
             const docSnap = await getDoc(doc(db, "users", uid, "months", monthId));    
             const savedData = docSnap.exists() ? docSnap.data() : {};   
             
-            const holSnap = await getDocs(collection(db, "users", uid, "holidays"));
-            const hList = holSnap.docs.map(doc => doc.id);
-            
+            const hList = await fetchUserHolidays(uid);
             const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
             const lList = levSnap.exists() ? levSnap.data() : {};
 
@@ -814,12 +826,6 @@
             }
         };
 
-        function renderConfigUserSelector() {
-            const select = document.getElementById('configUserSelect');
-            select.innerHTML = `<option value="">-- SELECT EMPLOYEE TO CONFIG --</option>` + 
-                allUsers.map(u => `<option value="${u.id}">[EPF: ${u.epf}] ${u.name.toUpperCase()}</option>`).join('');
-        }
-
         window.loadSelectedUserConfig = async () => {
             activeConfigUid = document.getElementById('configUserSelect').value;
             if(!activeConfigUid) {
@@ -832,8 +838,7 @@
         };
 
         async function loadConfigHolidays() {
-            const holSnap = await getDocs(collection(db, "users", activeConfigUid, "holidays"));
-            configHolidays = holSnap.docs.map(doc => doc.id);
+            configHolidays = await fetchUserHolidays(activeConfigUid);
             renderConfigHolidayList();
         }
 
@@ -919,7 +924,6 @@
 
         window.logout = logout;
         window.loadLoginLogs = loadLoginLogs;
-        window.loadAnalyticsData = loadAnalyticsData; // Bind for the HTML button
     </script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-900 pb-12 font-sans">
@@ -942,8 +946,7 @@
         <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
             <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Timesheets</button>
             <button onclick="switchSection('weeklySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-indigo-600">Weekly Check</button>
-            <!-- Analytics Tab Added -->
-            <button onclick="switchSection('analyticsSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-blue-500 font-black">Analytics</button> 
+            <button onclick="switchSection('analyticsSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-blue-500 font-black border border-blue-100">Analytics</button> 
             <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
             <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Manage Config</button>
             <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
@@ -955,21 +958,51 @@
         <!-- NEW SECTION: VISUAL ANALYTICS (CHART.JS) -->
         <div id="analyticsSection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
-                <h3 class="text-[10px] font-black text-blue-500 uppercase mb-3">Monthly Employee OT Chart</h3>
-                <div class="flex gap-2 mb-3">
-                    <select id="chartYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs flex-1 font-bold outline-none"><option>2026</option></select>
-                    <select id="chartMonth" class="bg-slate-50 border p-2.5 rounded-xl text-xs flex-1 font-bold outline-none">
-                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                <h3 class="text-[10px] font-black text-blue-500 uppercase mb-3">Dynamic Employee Analytics</h3>
+                
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <select id="chartTarget" onchange="toggleChartControls()" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none text-slate-700">
+                        <option value="all">All Employees</option>
+                        <option value="individual">Individual Employee</option>
+                    </select>
+                    <select id="chartTimeframe" onchange="toggleChartControls()" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none text-slate-700">
+                        <option value="monthly">Monthly Analysis</option>
+                        <option value="yearly">Yearly Analysis</option>
                     </select>
                 </div>
-                <button onclick="loadAnalyticsData()" class="w-full bg-blue-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm mb-4">Load Data To Chart</button>
+
+                <div id="chartEmployeeWrap" class="hidden mb-2">
+                    <select id="chartUserSelect" class="w-full bg-blue-50 border-2 border-blue-200 text-blue-700 p-2.5 rounded-xl text-xs font-black outline-none">
+                        <!-- Dropdown dynamically loads -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <select id="chartYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <div id="chartMonthWrap" class="w-full">
+                        <select id="chartMonth" class="w-full bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="chartMetricWrap" class="mb-3">
+                    <select id="chartMetric" class="w-full bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none text-slate-700">
+                        <option value="normal">Normal OT (Hours)</option>
+                        <option value="special">Special OT (Hours)</option>
+                        <option value="lieu">Lieu Days</option>
+                        <option value="nopay">No-Pay Days</option>
+                    </select>
+                </div>
+
+                <button onclick="loadAnalyticsData()" class="w-full bg-blue-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm mb-4">Generate Chart</button>
                 
                 <!-- Chart Container -->
-                <div class="relative w-full h-[250px] border rounded-2xl bg-slate-50 p-2 flex items-center justify-center">
-                    <div id="chartMessage" class="text-slate-400 text-[10px] font-bold uppercase">Select month and click Load</div>
+                <div class="relative w-full h-[280px] border rounded-2xl bg-slate-50 p-2 flex items-center justify-center">
+                    <div id="chartMessage" class="text-slate-400 text-[10px] font-bold uppercase">Select Options & Generate</div>
                     <canvas id="otChart" class="hidden"></canvas>
                 </div>
             </div>
@@ -1208,4 +1241,3 @@
     </div>
 </body>
 </html>
-
