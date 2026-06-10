@@ -1,57 +1,57 @@
 // charts.js
 let otChartInstance = null;
 
-export function drawOTChart(canvasId, labels, dataPoints) {
+export function drawAnalyticsChart(canvasId, type, labels, datasetLabel, dataPoints) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
 
-    // Kalin chart ekak draw karala thiyenawanm eka ain karanawa (Canvas reuse errors walakwanna)
     if (otChartInstance) {
         otChartInstance.destroy();
     }
 
-    // Aluth bar chart eka draw karanawa
+    // Default colors (Blue for Normal OT)
+    let bgColors = 'rgba(59, 130, 246, 0.7)';
+    let borderColors = 'rgb(37, 99, 235)';
+
+    // Change color based on metric
+    if(datasetLabel.includes('Special')) { bgColors = 'rgba(239, 68, 68, 0.7)'; borderColors = 'rgb(220, 38, 38)'; }
+    else if(datasetLabel.includes('Lieu')) { bgColors = 'rgba(168, 85, 247, 0.7)'; borderColors = 'rgb(147, 51, 234)'; }
+    else if(datasetLabel.includes('No-Pay')) { bgColors = 'rgba(249, 115, 22, 0.7)'; borderColors = 'rgb(234, 88, 12)'; }
+
+    // If showing all metrics at once (Individual Monthly)
+    if(labels.includes('Normal OT') && labels.includes('Special OT')) {
+        bgColors = labels.map(l => {
+            if(l === 'Normal OT') return 'rgba(59, 130, 246, 0.7)';
+            if(l === 'Special OT') return 'rgba(239, 68, 68, 0.7)';
+            if(l === 'Lieu Days') return 'rgba(168, 85, 247, 0.7)';
+            if(l === 'No-Pay') return 'rgba(249, 115, 22, 0.7)';
+        });
+        borderColors = labels.map(l => {
+            if(l === 'Normal OT') return 'rgb(37, 99, 235)';
+            if(l === 'Special OT') return 'rgb(220, 38, 38)';
+            if(l === 'Lieu Days') return 'rgb(147, 51, 234)';
+            if(l === 'No-Pay') return 'rgb(234, 88, 12)';
+        });
+    }
+
     otChartInstance = new Chart(ctx, {
-        type: 'bar',
+        type: type,
         data: {
-            labels: labels, // Employee Names
+            labels: labels,
             datasets: [{
-                label: 'Total Normal OT (Hours)',
-                data: dataPoints, // OT Hours
-                backgroundColor: 'rgba(59, 130, 246, 0.7)', // Tailwind blue-500 equivalent with opacity
-                borderColor: 'rgb(37, 99, 235)', // Tailwind blue-600
+                label: datasetLabel,
+                data: dataPoints,
+                backgroundColor: bgColors,
+                borderColor: borderColors,
                 borderWidth: 1,
-                borderRadius: 6,
-                hoverBackgroundColor: 'rgba(37, 99, 235, 1)'
+                borderRadius: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    labels: {
-                        font: { size: 10, weight: 'bold' }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Hours',
-                        font: { size: 10, weight: 'bold' }
-                    }
-                },
-                x: {
-                    ticks: {
-                        font: { size: 9, weight: 'bold' }
-                    }
-                }
-            }
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { labels: { font: { size: 10, weight: 'bold' } } } }
         }
     });
 }
-
-
