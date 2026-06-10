@@ -6,6 +6,8 @@
     <title>Admin Dashboard | CIC OT System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Chart.js Library eka add kala -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module">
         import { db, auth } from './firebase-config.js';
@@ -14,6 +16,7 @@
         import { generateAdminPDF } from './admin-report.js';
         import { generatePDF } from './report.js'; 
         import { validateMonthSheet } from './validator.js';
+        import { drawOTChart } from './charts.js'; // Aluth chart file eka import kala
         import { doc, setDoc, getDoc, collection, getDocs, query, updateDoc, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         let allUsers = [];
@@ -68,13 +71,89 @@
         }
 
         window.switchSection = async (sectionId) => {
-            ['timesheetSection', 'reportSection', 'employeeSection', 'logSection', 'noPaySection', 'auditSection', 'configSection', 'weeklySection'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            // Analytics section ekath hidden list ekata ekathu kala
+            ['timesheetSection', 'weeklySection', 'auditSection', 'configSection', 'reportSection', 'noPaySection', 'employeeSection', 'logSection', 'analyticsSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
             if(sectionId === 'logSection') {
                 await loadLoginLogs();
+            } else if (sectionId === 'analyticsSection') {
+                await loadAnalyticsData();
             }
         };
+
+        // --- NEW ANALYTICS TAB LOGIC ---
+        window.loadAnalyticsData = async () => {
+            const year = parseInt(document.getElementById('chartYear').value);
+            const monthVal = parseInt(document.getElementById('chartMonth').value);
+            const monthId = `${year}-${monthVal + 1}`;
+            const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
+            const containerMsg = document.getElementById('chartMessage');
+
+            containerMsg.innerHTML = "Fetching Data for Chart...";
+            containerMsg.classList.remove('hidden');
+            document.getElementById('otChart').classList.add('hidden');
+
+            let employeeNames = [];
+            let employeeOTHrs = [];
+
+            for (let userObj of allUsers) {
+                const uid = userObj.id;
+                const mSnap = await getDoc(doc(db, "users", uid, "months", monthId));
+                const attendance = mSnap.exists() ? mSnap.data() : {};
+
+                const holQuery = await getDocs(collection(db, "users", uid, "holidays"));
+                const userHolidays = holQuery.docs.map(d => d.id);
+
+                const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
+                const userLeaves = levSnap.exists() ? levSnap.data() : {};
+
+                let tNormalHrs = 0;
+                let deductionDays = 0;
+                let lastDayWasFullShift = false;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateObj = new Date(year, monthVal, d);
+                    const dayOfWeek = dateObj.getDay();
+                    const isoDate = dateObj.toLocaleDateString('en-CA');
+                    const isHoliday = userHolidays.includes(isoDate);
+                    const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
+                    const leaveData = userLeaves[d];
+
+                    const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                    lastDayWasFullShift = res.isFullDay;
+
+                    if (dayOfWeek !== 0 && !isHoliday) {
+                        tNormalHrs += res.worked;
+                    }
+
+                    if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
+                    else if (leaveData) {
+                        if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
+                        else if (leaveData.type === "Half Day") deductionDays += 0.5;
+                    }
+                }
+
+                const tShouldWork = (daysInMonth - deductionDays) * 9;
+                const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
+
+                // Add to chart arrays if they worked
+                if (tNormalOT > 0 || tNormalHrs > 0) {
+                    employeeNames.push(userObj.name.toUpperCase().split(' ')[0]); // Show first name to save space
+                    employeeOTHrs.push(parseFloat(tNormalOT.toFixed(1)));
+                }
+            }
+
+            if(employeeNames.length === 0) {
+                containerMsg.innerHTML = "No OT data available for this month.";
+            } else {
+                containerMsg.classList.add('hidden');
+                document.getElementById('otChart').classList.remove('hidden');
+                // Call external charts.js function
+                drawOTChart('otChart', employeeNames, employeeOTHrs);
+            }
+        };
+
 
         async function loadLoginLogs() {
             const container = document.getElementById('logListContainer');
@@ -112,7 +191,6 @@
                     container.appendChild(logRow);
                 });
             } catch(e) {
-                console.error("Firestore error:", e);
                 container.innerHTML = `<p class="text-red-500 text-center text-[10px] py-4">Error loading logs: ${e.message}</p>`;
             }
         }
@@ -277,7 +355,6 @@
             generatePDF(currentCalcData, currentMonthRows, employee.name.toUpperCase(), employee.epf, userLeaves);
         };
 
-        // --- NEW WEEKLY CALCULATION LOGIC (CALENDAR WEEKS) ---
         window.runWeeklyCheck = async () => {
             const uid = document.getElementById('weeklyUserSelect').value;
             if(!uid) return alert("Please select an employee first!");
@@ -299,13 +376,11 @@
             const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
             const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
-            // Divide month into calendar weeks (Monday to Sunday)
             let weeks = [];
             let currentWeek = [];
             for (let d = 1; d <= daysInMonth; d++) {
                 currentWeek.push(d);
                 const dateObj = new Date(year, month, d);
-                // 0 is Sunday. Close the week on Sunday or if it's the last day of the month
                 if (dateObj.getDay() === 0 || d === daysInMonth) {
                     weeks.push(currentWeek);
                     currentWeek = [];
@@ -844,6 +919,7 @@
 
         window.logout = logout;
         window.loadLoginLogs = loadLoginLogs;
+        window.loadAnalyticsData = loadAnalyticsData; // Bind for the HTML button
     </script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-900 pb-12 font-sans">
@@ -862,16 +938,41 @@
             <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">Logout</button>
         </div>
 
-        <!-- 8 Tab Dynamic Menu System -->
+        <!-- 9 Tab Dynamic Menu System -->
         <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
             <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Timesheets</button>
             <button onclick="switchSection('weeklySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-indigo-600">Weekly Check</button>
+            <!-- Analytics Tab Added -->
+            <button onclick="switchSection('analyticsSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-blue-500 font-black">Analytics</button> 
             <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
             <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Manage Config</button>
             <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
             <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay</button>
             <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
             <button onclick="switchSection('logSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Logs</button>
+        </div>
+
+        <!-- NEW SECTION: VISUAL ANALYTICS (CHART.JS) -->
+        <div id="analyticsSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-blue-500 uppercase mb-3">Monthly Employee OT Chart</h3>
+                <div class="flex gap-2 mb-3">
+                    <select id="chartYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs flex-1 font-bold outline-none"><option>2026</option></select>
+                    <select id="chartMonth" class="bg-slate-50 border p-2.5 rounded-xl text-xs flex-1 font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+                <button onclick="loadAnalyticsData()" class="w-full bg-blue-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm mb-4">Load Data To Chart</button>
+                
+                <!-- Chart Container -->
+                <div class="relative w-full h-[250px] border rounded-2xl bg-slate-50 p-2 flex items-center justify-center">
+                    <div id="chartMessage" class="text-slate-400 text-[10px] font-bold uppercase">Select month and click Load</div>
+                    <canvas id="otChart" class="hidden"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
@@ -895,7 +996,7 @@
             <div id="sheetContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
         </div>
 
-        <!-- NEW SECTION: WEEKLY TIME CHECK -->
+        <!-- SECTION: WEEKLY TIME CHECK -->
         <div id="weeklySection" class="hidden space-y-3">
             <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
                 <h3 class="text-[10px] font-black text-indigo-600 uppercase mb-3">Weekly Time Check Calculator</h3>
