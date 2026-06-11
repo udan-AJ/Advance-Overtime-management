@@ -81,3 +81,5 @@ export function generateAdminPDF(data) {
 
     html2pdf().from(content).set(opt).save();
 }
+
+
