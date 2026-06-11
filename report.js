@@ -107,7 +107,7 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
                             <div style="display: table-cell; padding-left: 10px;">${data.tSpecialOT.toFixed(1)}</div>
                         </div>
                         <div style="display: table-row;">
-                            <div style="display: table-cell; padding: 2px 0;">NUMBER OF SPECIAL LIEU LEAVES</div>
+                            <div style="display: table-cell; padding: 2px 0;">NUMBER OF LIEU LEAVES</div>
                             <div style="display: table-cell;">-</div>
                             <div style="display: table-cell; padding-left: 10px;">${data.tLieuDays}</div>
                         </div>
