@@ -35,7 +35,7 @@ export function generateAdminPDF(data) {
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 31%; text-align: left; padding-left: 6px;">EMPLOYEE NAME</th>
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">NORMAL OT (HRS)</th>
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">SPECIAL OT (HRS)</th>
-                        <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">SPECIAL LIEU LEAVES</th>
+                        <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">LIEU LEAVES</th>
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">NO PAY DAYS</th>
                     </tr>
                 </thead>
