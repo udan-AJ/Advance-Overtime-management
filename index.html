@@ -89,7 +89,6 @@
             container.innerHTML = "";    
             currentMonthRows = [];
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
-            let takenLieuDays = 0;
             let lastDayWasFullShift = false;
             let wC = 0, hC = 0, fLC = 0, hDC = 0;
     
@@ -112,8 +111,7 @@
                     deductionDays += 1;
                     if(dayOfWeek === 0 || dayOfWeek === 6) wC++; else hC++;
                 } else if (leaveData) {
-                    if (leaveData.type === "Full Leave") { deductionDays += 1; fLC++; }
-                    else if (leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; takenLieuDays++; }
+                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; }
                     else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
                 }
 
@@ -164,8 +162,6 @@
                 `;    
                 container.appendChild(row);    
             }    
-
-            tLieuDays = tLieuDays - takenLieuDays;
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
