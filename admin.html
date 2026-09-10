@@ -98,7 +98,6 @@
             return snap.docs.map(d => d.id);
         }
 
-        // --- UPDATED: getUserMonthStats with Lieu Leave Balance Logic ---
         async function getUserMonthStats(uid, year, monthVal, userHols) {
             const monthId = `${year}-${monthVal + 1}`;
             const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
@@ -110,7 +109,7 @@
             const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
-            let takenLieuDays = 0; // NEW: Track taken lieu leaves
+            let takenLieuDays = 0; 
             let lastDayWasFullShift = false;
 
             for (let d = 1; d <= daysInMonth; d++) {
@@ -121,15 +120,30 @@
                 const dayData = attendance[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
                 const leaveData = userLeaves[d];
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                // --- Next Day Off Logic ---
+                let isNextDayOff = false;
+                if (d === daysInMonth) {
+                    isNextDayOff = true; 
+                } else {
+                    const nDate = new Date(year, monthVal, d + 1);
+                    const nDOW = nDate.getDay();
+                    const nHol = userHols.includes(nDate.toLocaleDateString('en-CA'));
+                    const nLev = userLeaves[d + 1];
+                    if (nDOW === 0 || nDOW === 6 || nHol) {
+                        isNextDayOff = true;
+                    } else if (nLev && (nLev.type.includes("Full") || nLev.type.includes("Lieu"))) {
+                        isNextDayOff = true;
+                    }
+                }
+
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
                 lastDayWasFullShift = res.isFullDay;
 
-                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; // Earned
+                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; 
                 
                 if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
                 else tNormalHrs += res.worked;
 
-                // --- Updated Leave Logic for Deduction & Taken Lieu ---
                 let isOffDay = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday);
                 
                 if (isOffDay) {
@@ -149,10 +163,8 @@
                         if (!isOffDay) deductionDays += 0.5; 
                     }
                 }
-                // ----------------------------------------------------
             }
 
-            // Calculate Balance
             tLieuDays = tLieuDays - takenLieuDays;
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
@@ -167,7 +179,7 @@
             return {
                 normal: parseFloat(tNormalOT.toFixed(1)),
                 special: parseFloat(tSpecialOT.toFixed(1)),
-                lieu: tLieuDays, // Balance goes to reports & charts
+                lieu: tLieuDays, 
                 nopay: noPayCount
             };
         }
@@ -327,7 +339,6 @@
             renderAdminSheet();
         };
 
-        // --- UPDATED: renderAdminSheet with Lieu Leave Balance Logic ---
         async function renderAdminSheet() {
             if(!activeTimesheetUid) return;
             const month = parseInt(document.getElementById('monthSelect').value);    
@@ -343,7 +354,7 @@
             container.innerHTML = "";    
             currentMonthRows = [];
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
-            let takenLieuDays = 0; // NEW
+            let takenLieuDays = 0; 
             let lastDayWasFullShift = false;
             let wC = 0, hC = 0, fLC = 0, hDC = 0;
     
@@ -355,14 +366,29 @@
                 const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false, workType: "" };    
                 const leaveData = userLeaves[d];
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
-                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; // Earned
+                // --- Next Day Off Logic ---
+                let isNextDayOff = false;
+                if (d === daysInMonth) {
+                    isNextDayOff = true; 
+                } else {
+                    const nDate = new Date(year, month, d + 1);
+                    const nDOW = nDate.getDay();
+                    const nHol = userHolidays.includes(nDate.toLocaleDateString('en-CA'));
+                    const nLev = userLeaves[d + 1];
+                    if (nDOW === 0 || nDOW === 6 || nHol) {
+                        isNextDayOff = true;
+                    } else if (nLev && (nLev.type.includes("Full") || nLev.type.includes("Lieu"))) {
+                        isNextDayOff = true;
+                    }
+                }
+
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
+                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; 
                 lastDayWasFullShift = res.isFullDay;
 
                 if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
                 else tNormalHrs += res.worked;
 
-                // --- Updated Leave Logic ---
                 let isOffDay = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday);
                 
                 if (isOffDay) {
@@ -374,13 +400,12 @@
                         deductionDays += 1; fLC++; 
                     }
                     else if (lType.includes("Lieu")) { 
-                        deductionDays += 1; fLC++; takenLieuDays++; // Track Taken 
+                        deductionDays += 1; fLC++; takenLieuDays++; 
                     }
                     else if (lType.includes("Half")) { 
                         deductionDays += 0.5; hDC++; 
                     }
                 }
-                // ---------------------------
 
                 if (res.worked > 0 || leaveData) {
                     currentMonthRows.push({ 
@@ -430,14 +455,12 @@
                 container.appendChild(row);    
             }    
 
-            // Calculate Balance
             let earnedLieuDays = tLieuDays;
             tLieuDays = earnedLieuDays - takenLieuDays;
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
             
-            // Includes earnedLieuDays, takenLieuDays for PDF Reports
             currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, earnedLieuDays, takenLieuDays, workingDays: (daysInMonth - deductionDays), monthId };
 
             document.getElementById('totalHrs').innerHTML = `
@@ -505,7 +528,23 @@
                 const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false };
                 const leaveData = userLeaves[d];
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                // --- Next Day Off Logic ---
+                let isNextDayOff = false;
+                if (d === daysInMonth) {
+                    isNextDayOff = true; 
+                } else {
+                    const nDate = new Date(year, month, d + 1);
+                    const nDOW = nDate.getDay();
+                    const nHol = userHolidays.includes(nDate.toLocaleDateString('en-CA'));
+                    const nLev = userLeaves[d + 1];
+                    if (nDOW === 0 || nDOW === 6 || nHol) {
+                        isNextDayOff = true;
+                    } else if (nLev && (nLev.type.includes("Full") || nLev.type.includes("Lieu"))) {
+                        isNextDayOff = true;
+                    }
+                }
+
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
                 lastDayWasFullShift = res.isFullDay;
 
                 let normalWorked = 0;
