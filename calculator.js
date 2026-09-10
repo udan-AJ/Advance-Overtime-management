@@ -4,10 +4,9 @@ export function cleanTime(val) {
     return m ? `${m[1].padStart(2,'0')}:${m[2].padStart(2,'0')}` : "00:00";
 }
 
-export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isLastDay) {
+export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isNextDayOff) {
     const hasData = (inTime && outTime && inTime !== "00:00" && outTime !== "00:00");
     
-    // දත්ත නොමැති දින සඳහා Logic එක
     if (!hasData) {
         let baseReq = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
         
@@ -24,7 +23,6 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
     let totalMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
     if (isNextDay) totalMinutes += 1440;
 
-    // Short Leave Bonus Logic
     let shortLeaveBonusMinutes = 0;
     if (leaveData && leaveData.type === "Short Leave") {
         let arrivalMin = h1 * 60 + m1;
@@ -40,8 +38,6 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
 
     let isFullDay = roundedWorked >= 15; 
     
-    // --- [REQ CALCULATION LOGIC] ---
-    // කලින් දවසේ Full Shift එකක් කළා නම් අද Req 0 වේ (අද සාමාන්‍ය දවසක් නම්).
     let req = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
 
     if (leaveData) {
@@ -51,18 +47,8 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
             req = Math.max(0, req - 4.5);
         }
     } else if (isFullDay && req > 0) {
-        // [UPDATED EXCEPTION LOGIC]:
-        // අද සේවකයා Full Shift (Day-Night) එකක් කර තිබේ නම්:
-        // සාමාන්‍යයෙන් හෙට දවසත් එක්ක Req 18ක් වේ.
-        // නමුත් හෙට දවස සිකුරාදා නම් (එතකොට සෙනසුරාදා නිවාඩු නිසා) Req 9ක් පමණි.
-        if (dayOfWeek === 5) {
-            req = 9;
-        } else {
-            // *** මෙන්න මෙතනට ඔයා කියපු සුපිරි වෙනස්කම දැම්මා ***
-            // මාසයේ අන්තිම දවස නම් (isLastDay) හෝ "ඊළඟ දවස නිවාඩු දවසක් (Holiday/Poya)" කියා Admin Panel එකෙන් දැනගන්නා නිසා,
-            // (පද්ධතිය මඟින් render කරද්දී හෙට දවසේ cover කරන්න දෙයක් නැති බව හඳුනාගෙන) Req එක 9ක් පමණක් කරයි!
-            req = isLastDay ? 9 : 18; 
-        }
+        // ඊළඟ දවස නිවාඩු නම් (Leave/Holiday/Weekend) Req එක 9ක් පමණි!
+        req = isNextDayOff ? 9 : 18; 
     }
 
     let ot = (dayOfWeek === 0 || isHoliday) ? 0 : Math.max(0, roundedWorked - req);
