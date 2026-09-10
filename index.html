@@ -88,7 +88,7 @@
             currentMonthRows = [];
             
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
-            let takenLieuDays = 0; // අලුතින් එකතු කළා
+            let takenLieuDays = 0; 
             let lastDayWasFullShift = false;
             let wC = 0, hC = 0, fLC = 0, hDC = 0;
     
@@ -100,14 +100,30 @@
                 const dayData = savedData[String(d)] || { in: "00:00", out: "00:00", isNextDay: false, workType: "" };    
                 const leaveData = userLeaves[d];
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
+                // --- හෙට දවස නිවාඩු දවසක්ද කියලා හොයනවා ---
+                let isNextDayOff = false;
+                if (d === daysInMonth) {
+                    isNextDayOff = true; 
+                } else {
+                    const nDate = new Date(year, month, d + 1);
+                    const nDOW = nDate.getDay();
+                    const nHol = userHolidays.includes(nDate.toLocaleDateString('en-CA'));
+                    const nLev = userLeaves[d + 1];
+                    if (nDOW === 0 || nDOW === 6 || nHol) {
+                        isNextDayOff = true;
+                    } else if (nLev && (nLev.type.includes("Full") || nLev.type.includes("Lieu"))) {
+                        isNextDayOff = true;
+                    }
+                }
+                // -----------------------------------------------------------
+
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
                 if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
                 lastDayWasFullShift = res.isFullDay;
 
                 if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
                 else tNormalHrs += res.worked;
 
-                // --- නිවැරදි Leave Logic එක ---
                 let isOffDay = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday);
                 
                 if (isOffDay) {
@@ -123,7 +139,7 @@
                     }
                     else if (lType.includes("Lieu")) { 
                         fLC++; 
-                        takenLieuDays++; // ගත්ත Lieu leave එක මෙතනින් එකතු වෙනවා
+                        takenLieuDays++; 
                         if (!isOffDay) deductionDays += 1; 
                     }
                     else if (lType.includes("Half")) { 
@@ -131,7 +147,6 @@
                         if (!isOffDay) deductionDays += 0.5; 
                     }
                 }
-                // ----------------------------------------
 
                 if (res.worked > 0 || leaveData) {
                     currentMonthRows.push({ 
@@ -182,7 +197,7 @@
             }    
 
             let earnedLieuDays = tLieuDays;
-            tLieuDays = tLieuDays - takenLieuDays; // Balance එක හදනවා
+            tLieuDays = tLieuDays - takenLieuDays;
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
