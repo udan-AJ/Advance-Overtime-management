@@ -11,10 +11,8 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
 
     const officialWorkingDays = data.daysInMonth - (data.weekendCount + data.holidayCount);
 
-    // Filter logic: Worked hours 0 ta wadi (overtime karapu) dawas witarak table ekata gannawa
     const filteredOTRows = rows.filter(row => row.worked > 0);
 
-    // Index eke leaves section eken okkoma leaves summary ekata gannawa
     const leaveEntries = Object.entries(userLeaves || {})
         .map(([day, val]) => ({
             day: parseInt(day),
@@ -107,9 +105,12 @@ export function generatePDF(data, rows, name, epf, userLeaves) {
                             <div style="display: table-cell; padding-left: 10px;">${data.tSpecialOT.toFixed(1)}</div>
                         </div>
                         <div style="display: table-row;">
-                            <div style="display: table-cell; padding: 2px 0;">NUMBER OF LIEU LEAVES</div>
+                            <div style="display: table-cell; padding: 2px 0;">NUMBER OF LIEU LEAVES (BALANCE)</div>
                             <div style="display: table-cell;">-</div>
-                            <div style="display: table-cell; padding-left: 10px;">${data.tLieuDays}</div>
+                            <div style="display: table-cell; padding-left: 10px;">
+                                ${data.tLieuDays}
+                                ${data.takenLieuDays > 0 ? `<span style="font-size: 8.5px; color: #555; font-weight: normal;">(Earned: ${data.earnedLieuDays} - Taken: ${data.takenLieuDays})</span>` : ''}
+                            </div>
                         </div>
                     </div>
                 </div>
