@@ -1,5 +1,4 @@
 export function generateAdminPDF(data) {
-    // Columns Grand Totals Calculate කිරීම
     let totalNormalOT = 0;
     let totalSpecialOT = 0;
     let totalLieu = 0;
@@ -35,7 +34,7 @@ export function generateAdminPDF(data) {
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 31%; text-align: left; padding-left: 6px;">EMPLOYEE NAME</th>
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">NORMAL OT (HRS)</th>
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">SPECIAL OT (HRS)</th>
-                        <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">LIEU LEAVES</th>
+                        <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">LIEU LEAVES (BAL)</th>
                         <th style="border: 1px solid #000; padding: 7px 2px; width: 14%;">NO PAY DAYS</th>
                     </tr>
                 </thead>
@@ -81,5 +80,3 @@ export function generateAdminPDF(data) {
 
     html2pdf().from(content).set(opt).save();
 }
-
-
