@@ -22,10 +22,8 @@
 
         initAuth(
             async (user) => {
-                // මුලින්ම user අරන් Firestore එකේ isAdmin true ද බලනවා
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists() && userDoc.data().isAdmin) {
-                    // Admin කෙනෙක් නම් index එකේ UI එක පෙන්නන්නේ නැතුව direct admin.html එකට පන්නනවා
                     window.location.href = "admin.html";
                     return; 
                 }
@@ -88,7 +86,9 @@
 
             container.innerHTML = "";    
             currentMonthRows = [];
+            
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
+            let takenLieuDays = 0; // අලුතින් එකතු කළා
             let lastDayWasFullShift = false;
             let wC = 0, hC = 0, fLC = 0, hDC = 0;
     
@@ -107,13 +107,31 @@
                 if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
                 else tNormalHrs += res.worked;
 
-                if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) {
+                // --- නිවැරදි Leave Logic එක ---
+                let isOffDay = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday);
+                
+                if (isOffDay) {
                     deductionDays += 1;
                     if(dayOfWeek === 0 || dayOfWeek === 6) wC++; else hC++;
-                } else if (leaveData) {
-                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; }
-                    else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
                 }
+                
+                if (leaveData) {
+                    let lType = leaveData.type || "";
+                    if (lType.includes("Full")) { 
+                        fLC++; 
+                        if (!isOffDay) deductionDays += 1; 
+                    }
+                    else if (lType.includes("Lieu")) { 
+                        fLC++; 
+                        takenLieuDays++; // ගත්ත Lieu leave එක මෙතනින් එකතු වෙනවා
+                        if (!isOffDay) deductionDays += 1; 
+                    }
+                    else if (lType.includes("Half")) { 
+                        hDC++; 
+                        if (!isOffDay) deductionDays += 0.5; 
+                    }
+                }
+                // ----------------------------------------
 
                 if (res.worked > 0 || leaveData) {
                     currentMonthRows.push({ 
@@ -163,9 +181,12 @@
                 container.appendChild(row);    
             }    
 
+            let earnedLieuDays = tLieuDays;
+            tLieuDays = tLieuDays - takenLieuDays; // Balance එක හදනවා
+
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
-            currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, workingDays: (daysInMonth - deductionDays) };
+            currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, earnedLieuDays, takenLieuDays, workingDays: (daysInMonth - deductionDays) };
 
             document.getElementById('totalHrs').innerHTML = `
                 <div class="grid grid-cols-1 gap-1 text-[9px] leading-tight mb-2">
@@ -173,7 +194,10 @@
                     <div class="flex justify-between"><span>Should Work:</span> <span class="font-bold">${tShouldWork.toFixed(1)}</span></div>
                     <div class="flex justify-between text-yellow-300"><span>Normal OT:</span> <span class="font-bold">${tNormalOT.toFixed(1)}</span></div>
                     <div class="flex justify-between text-orange-300"><span>Special OT:</span> <span class="font-bold">${tSpecialOT.toFixed(1)}</span></div>
-                    <div class="flex justify-between text-blue-300 border-t border-white/20 pt-1 mt-1"><span>Lieu Days:</span> <span class="font-bold">${tLieuDays}</span></div>
+                    <div class="flex justify-between text-blue-300 border-t border-white/20 pt-1 mt-1">
+                        <span>Lieu Days (Bal):</span> 
+                        <span class="font-bold">${tLieuDays} ${takenLieuDays > 0 ? `<span class="text-[7px] text-blue-200 font-normal">(${earnedLieuDays} - ${takenLieuDays})</span>` : ''}</span>
+                    </div>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="showCalculationInfo()" class="flex-1 bg-white/20 py-2 rounded-xl text-[8px] font-black uppercase">Logic</button>
@@ -206,9 +230,8 @@
 
         window.handleLogin = () => {
             let emailVal = document.getElementById('email').value.trim();
-            // මෙන්න මෙතනදි 'admin' විතරක් ගැහුවොත් ඔයාගේ admin email එකට auto convert කරනවා
             if(emailVal.toLowerCase() === 'admin') {
-                emailVal = 'admin@admin.com'; // **Oyaage aththa admin email eka meka venuwata danna**
+                emailVal = 'admin@admin.com'; 
             }
             login(emailVal, document.getElementById('pass').value).catch(e => alert(e.message));
         };
