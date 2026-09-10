@@ -67,7 +67,7 @@
             renderConfigUserSelector(); 
             await loadHODProfile(); 
             await loadLoginLogs(); 
-            window.toggleChartControls(); // Set initial analytics UI state
+            window.toggleChartControls(); 
         }
 
         window.switchSection = async (sectionId) => {
@@ -79,7 +79,6 @@
             }
         };
 
-        // --- DYNAMIC ANALYTICS LOGIC ---
         window.toggleChartControls = () => {
             const target = document.getElementById('chartTarget').value;
             const time = document.getElementById('chartTimeframe').value;
@@ -88,7 +87,7 @@
             document.getElementById('chartMonthWrap').classList.toggle('hidden', time === 'yearly');
             
             if (target === 'individual' && time === 'monthly') {
-                document.getElementById('chartMetricWrap').classList.add('hidden'); // We will show all 4 metrics
+                document.getElementById('chartMetricWrap').classList.add('hidden');
             } else {
                 document.getElementById('chartMetricWrap').classList.remove('hidden');
             }
@@ -99,6 +98,7 @@
             return snap.docs.map(d => d.id);
         }
 
+        // --- UPDATED: getUserMonthStats with Lieu Leave Balance Logic ---
         async function getUserMonthStats(uid, year, monthVal, userHols) {
             const monthId = `${year}-${monthVal + 1}`;
             const daysInMonth = new Date(year, monthVal + 1, 0).getDate();
@@ -110,6 +110,7 @@
             const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
+            let takenLieuDays = 0; // NEW: Track taken lieu leaves
             let lastDayWasFullShift = false;
 
             for (let d = 1; d <= daysInMonth; d++) {
@@ -123,17 +124,36 @@
                 const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
                 lastDayWasFullShift = res.isFullDay;
 
-                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
+                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; // Earned
                 
                 if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
                 else tNormalHrs += res.worked;
 
-                if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) deductionDays += 1;
-                else if (leaveData) {
-                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") deductionDays += 1;
-                    else if (leaveData.type === "Half Day") deductionDays += 0.5;
+                // --- Updated Leave Logic for Deduction & Taken Lieu ---
+                let isOffDay = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday);
+                
+                if (isOffDay) {
+                    deductionDays += 1;
                 }
+                
+                if (leaveData) {
+                    let lType = leaveData.type || "";
+                    if (lType.includes("Full")) { 
+                        if (!isOffDay) deductionDays += 1; 
+                    }
+                    else if (lType.includes("Lieu")) { 
+                        takenLieuDays++; 
+                        if (!isOffDay) deductionDays += 1; 
+                    }
+                    else if (lType.includes("Half")) { 
+                        if (!isOffDay) deductionDays += 0.5; 
+                    }
+                }
+                // ----------------------------------------------------
             }
+
+            // Calculate Balance
+            tLieuDays = tLieuDays - takenLieuDays;
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
@@ -147,7 +167,7 @@
             return {
                 normal: parseFloat(tNormalOT.toFixed(1)),
                 special: parseFloat(tSpecialOT.toFixed(1)),
-                lieu: tLieuDays,
+                lieu: tLieuDays, // Balance goes to reports & charts
                 nopay: noPayCount
             };
         }
@@ -199,14 +219,12 @@
                     const hols = await fetchUserHolidays(uid);
 
                     if (time === 'monthly') {
-                        // Show all 4 metrics for 1 employee
                         chartTitle = `${uObj.name.split(' ')[0]}'s Profile Summary (${year}/${monthVal + 1})`;
                         const stats = await getUserMonthStats(uid, year, monthVal, hols);
                         labels = ['Normal OT', 'Special OT', 'Lieu Days', 'No-Pay'];
                         dataPoints = [stats.normal, stats.special, stats.lieu, stats.nopay];
                     } 
                     else {
-                        // Yearly for 1 employee
                         chartTitle = `${uObj.name.split(' ')[0]}'s ${metricNames[metric]} (${year})`;
                         labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                         for (let m = 0; m < 12; m++) {
@@ -223,7 +241,6 @@
                 containerMsg.innerHTML = "Error generating chart: " + e.message;
             }
         };
-
 
         async function loadLoginLogs() {
             const container = document.getElementById('logListContainer');
@@ -310,6 +327,7 @@
             renderAdminSheet();
         };
 
+        // --- UPDATED: renderAdminSheet with Lieu Leave Balance Logic ---
         async function renderAdminSheet() {
             if(!activeTimesheetUid) return;
             const month = parseInt(document.getElementById('monthSelect').value);    
@@ -325,6 +343,7 @@
             container.innerHTML = "";    
             currentMonthRows = [];
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
+            let takenLieuDays = 0; // NEW
             let lastDayWasFullShift = false;
             let wC = 0, hC = 0, fLC = 0, hDC = 0;
     
@@ -337,19 +356,31 @@
                 const leaveData = userLeaves[d];
 
                 const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, (d === daysInMonth));
-                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
+                if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; // Earned
                 lastDayWasFullShift = res.isFullDay;
 
                 if (dayOfWeek === 0 || isHoliday) tSpecialOT += res.worked;
                 else tNormalHrs += res.worked;
 
-                if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday) {
+                // --- Updated Leave Logic ---
+                let isOffDay = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday);
+                
+                if (isOffDay) {
                     deductionDays += 1;
                     if(dayOfWeek === 0 || dayOfWeek === 6) wC++; else hC++;
                 } else if (leaveData) {
-                    if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") { deductionDays += 1; fLC++; }
-                    else if (leaveData.type === "Half Day") { deductionDays += 0.5; hDC++; }
+                    let lType = leaveData.type || "";
+                    if (lType.includes("Full")) { 
+                        deductionDays += 1; fLC++; 
+                    }
+                    else if (lType.includes("Lieu")) { 
+                        deductionDays += 1; fLC++; takenLieuDays++; // Track Taken 
+                    }
+                    else if (lType.includes("Half")) { 
+                        deductionDays += 0.5; hDC++; 
+                    }
                 }
+                // ---------------------------
 
                 if (res.worked > 0 || leaveData) {
                     currentMonthRows.push({ 
@@ -399,10 +430,15 @@
                 container.appendChild(row);    
             }    
 
+            // Calculate Balance
+            let earnedLieuDays = tLieuDays;
+            tLieuDays = earnedLieuDays - takenLieuDays;
+
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
             
-            currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, workingDays: (daysInMonth - deductionDays), monthId };
+            // Includes earnedLieuDays, takenLieuDays for PDF Reports
+            currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, earnedLieuDays, takenLieuDays, workingDays: (daysInMonth - deductionDays), monthId };
 
             document.getElementById('totalHrs').innerHTML = `
                 <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-3 rounded-2xl border font-bold mb-2">
@@ -410,7 +446,10 @@
                     <div>Should Work: <span class="text-slate-700">${tShouldWork.toFixed(1)}</span></div>
                     <div class="text-blue-600">Normal OT: <span class="font-black text-xs">${tNormalOT.toFixed(1)}</span></div>
                     <div class="text-red-500">Special OT: <span class="font-black text-xs">${tSpecialOT.toFixed(1)}</span></div>
-                    <div class="text-purple-600 col-span-2 border-t pt-1">Total Lieu Days: <span>${tLieuDays}</span></div>
+                    <div class="text-purple-600 col-span-2 border-t pt-1">
+                        Lieu Days (Bal): 
+                        <span>${tLieuDays} ${takenLieuDays > 0 ? `<span class="text-[9px] text-purple-400 font-normal ml-1">(${earnedLieuDays} Earned - ${takenLieuDays} Taken)</span>` : ''}</span>
+                    </div>
                 </div>
                 <button onclick="printSelectedUserReport()" class="w-full bg-blue-600 text-white font-black text-xs py-2.5 rounded-xl uppercase shadow-sm tracking-wide border border-blue-700">Print Employee Report (PDF)</button>
             `;    
@@ -495,9 +534,10 @@
                     } else if (info.isHoliday) {
                         weekdayHolidays += 1;
                     } else if (info.leaveData) {
-                        if (info.leaveData.type === "Full Leave" || info.leaveData.type === "Lieu Leave") {
+                        let lType = info.leaveData.type || "";
+                        if (lType.includes("Full") || lType.includes("Lieu")) {
                             leaveDeductions += 1;
-                        } else if (info.leaveData.type === "Half Day") {
+                        } else if (lType.includes("Half")) {
                             leaveDeductions += 0.5;
                         }
                     }
