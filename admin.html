@@ -566,7 +566,6 @@
 
             container.innerHTML = "";
 
-            // PC එකේ Grid විදියට පෙන්නන්න
             const wrapper = document.createElement('div');
             wrapper.className = "md:grid md:grid-cols-2 md:gap-4 space-y-3 md:space-y-0";
             container.appendChild(wrapper);
@@ -1033,325 +1032,328 @@
         </div>
     </div>
 
-    <!-- PC Dashboard Layout Added -->
-    <div id="adminScreen" class="hidden w-full max-w-7xl mx-auto p-3 md:p-6 md:flex md:gap-8 items-start">
-        
-        <!-- Sidebar (Left) -->
-        <div class="md:w-64 lg:w-72 flex-shrink-0 flex flex-col gap-3 md:gap-5 sticky top-0 md:top-6 z-30 shadow-sm md:shadow-none">
+    <!-- [නිවැරදි කළ තැන]: Hidden Wrapper එකක් දැම්මා -->
+    <div id="adminScreen" class="hidden">
+        <!-- PC Dashboard Layout Added -->
+        <div class="w-full max-w-7xl mx-auto p-3 md:p-6 md:flex md:gap-8 items-start">
             
-            <!-- Dashboard Header / Logout -->
-            <div class="bg-white p-4 md:p-6 md:rounded-3xl border-b md:border shadow-sm flex justify-between md:flex-col items-center md:items-start gap-4">
-                <div>
-                    <h1 class="text-xs md:text-base font-black text-slate-800 uppercase tracking-tight">CIC Admin Board</h1>
-                    <p class="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase mt-0.5">Control Panel V2</p>
+            <!-- Sidebar (Left) -->
+            <div class="md:w-64 lg:w-72 flex-shrink-0 flex flex-col gap-3 md:gap-5 sticky top-0 md:top-6 z-30 shadow-sm md:shadow-none">
+                
+                <!-- Dashboard Header / Logout -->
+                <div class="bg-white p-4 md:p-6 md:rounded-3xl border-b md:border shadow-sm flex justify-between md:flex-col items-center md:items-start gap-4">
+                    <div>
+                        <h1 class="text-xs md:text-base font-black text-slate-800 uppercase tracking-tight">CIC Admin Board</h1>
+                        <p class="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase mt-0.5">Control Panel V2</p>
+                    </div>
+                    <button onclick="logout()" class="bg-red-50 hover:bg-red-100 transition-colors text-red-500 border border-red-100 px-4 py-2 md:py-2.5 md:w-full rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase">Secure Logout</button>
                 </div>
-                <button onclick="logout()" class="bg-red-50 hover:bg-red-100 transition-colors text-red-500 border border-red-100 px-4 py-2 md:py-2.5 md:w-full rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase">Secure Logout</button>
+
+                <!-- Dashboard Navigation -->
+                <div class="bg-white p-2 md:p-3 md:rounded-3xl border-b md:border flex flex-wrap md:flex-col gap-1 md:gap-1.5 text-center shadow-sm text-[8px] md:text-xs font-black uppercase tracking-wider">
+                    <button id="nav-timesheetSection" onclick="switchSection('timesheetSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 transition-all">Timesheets</button>
+                    <button id="nav-weeklySection" onclick="switchSection('weeklySection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Weekly Check</button>
+                    <button id="nav-analyticsSection" onclick="switchSection('analyticsSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Analytics</button> 
+                    <button id="nav-auditSection" onclick="switchSection('auditSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Auditor</button>
+                    <button id="nav-configSection" onclick="switchSection('configSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Manage Config</button>
+                    <button id="nav-reportSection" onclick="switchSection('reportSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Report</button>
+                    <button id="nav-noPaySection" onclick="switchSection('noPaySection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">No-Pay</button>
+                    <button id="nav-employeeSection" onclick="switchSection('employeeSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Employees</button>
+                    <button id="nav-logSection" onclick="switchSection('logSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Logs</button>
+                </div>
             </div>
 
-            <!-- Dashboard Navigation -->
-            <div class="bg-white p-2 md:p-3 md:rounded-3xl border-b md:border flex flex-wrap md:flex-col gap-1 md:gap-1.5 text-center shadow-sm text-[8px] md:text-xs font-black uppercase tracking-wider">
-                <button id="nav-timesheetSection" onclick="switchSection('timesheetSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 transition-all">Timesheets</button>
-                <button id="nav-weeklySection" onclick="switchSection('weeklySection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Weekly Check</button>
-                <button id="nav-analyticsSection" onclick="switchSection('analyticsSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Analytics</button> 
-                <button id="nav-auditSection" onclick="switchSection('auditSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Auditor</button>
-                <button id="nav-configSection" onclick="switchSection('configSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Manage Config</button>
-                <button id="nav-reportSection" onclick="switchSection('reportSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Report</button>
-                <button id="nav-noPaySection" onclick="switchSection('noPaySection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">No-Pay</button>
-                <button id="nav-employeeSection" onclick="switchSection('employeeSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Employees</button>
-                <button id="nav-logSection" onclick="switchSection('logSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Logs</button>
-            </div>
-        </div>
+            <!-- Right Content Panels -->
+            <div class="flex-1 w-full min-w-0 space-y-4 mt-3 md:mt-0">
+                
+                <!-- SECTION: VISUAL ANALYTICS (CHART.JS) -->
+                <div id="analyticsSection" class="hidden animate-in fade-in duration-300">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
+                        <h3 class="text-[10px] md:text-xs font-black text-blue-600 uppercase mb-4 tracking-wider">Dynamic Employee Analytics</h3>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="chartTarget" onchange="toggleChartControls()" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
+                                <option value="all">All Employees</option>
+                                <option value="individual">Individual Employee</option>
+                            </select>
+                            <select id="chartTimeframe" onchange="toggleChartControls()" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
+                                <option value="monthly">Monthly Analysis</option>
+                                <option value="yearly">Yearly Analysis</option>
+                            </select>
+                        </div>
 
-        <!-- Right Content Panels -->
-        <div class="flex-1 w-full min-w-0 space-y-4 mt-3 md:mt-0">
-            
-            <!-- SECTION: VISUAL ANALYTICS (CHART.JS) -->
-            <div id="analyticsSection" class="hidden animate-in fade-in duration-300">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-[10px] md:text-xs font-black text-blue-600 uppercase mb-4 tracking-wider">Dynamic Employee Analytics</h3>
-                    
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="chartTarget" onchange="toggleChartControls()" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
-                            <option value="all">All Employees</option>
-                            <option value="individual">Individual Employee</option>
-                        </select>
-                        <select id="chartTimeframe" onchange="toggleChartControls()" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
-                            <option value="monthly">Monthly Analysis</option>
-                            <option value="yearly">Yearly Analysis</option>
-                        </select>
+                        <div id="chartEmployeeWrap" class="hidden mb-3">
+                            <select id="chartUserSelect" class="w-full bg-blue-50 border-2 border-blue-200 text-blue-700 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-blue-400">
+                                <!-- Dropdown dynamically loads -->
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="chartYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400"><option>2026</option></select>
+                            <div id="chartMonthWrap" class="w-full">
+                                <select id="chartMonth" class="w-full bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400">
+                                    <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                                    <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                                    <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                                    <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="chartMetricWrap" class="mb-4">
+                            <select id="chartMetric" class="w-full bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
+                                <option value="normal">Normal OT (Hours)</option>
+                                <option value="special">Special OT (Hours)</option>
+                                <option value="lieu">Lieu Days</option>
+                                <option value="nopay">No-Pay Days</option>
+                            </select>
+                        </div>
+
+                        <button onclick="loadAnalyticsData()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg mb-6 tracking-widest">Generate Chart</button>
+                        
+                        <!-- Chart Container -->
+                        <div class="relative w-full h-[280px] md:h-[400px] border-2 border-slate-100 rounded-[2rem] bg-slate-50 p-4 flex items-center justify-center shadow-inner">
+                            <div id="chartMessage" class="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Select Options & Generate</div>
+                            <canvas id="otChart" class="hidden w-full h-full"></canvas>
+                        </div>
                     </div>
+                </div>
 
-                    <div id="chartEmployeeWrap" class="hidden mb-3">
-                        <select id="chartUserSelect" class="w-full bg-blue-50 border-2 border-blue-200 text-blue-700 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-blue-400">
-                            <!-- Dropdown dynamically loads -->
-                        </select>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="chartYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400"><option>2026</option></select>
-                        <div id="chartMonthWrap" class="w-full">
-                            <select id="chartMonth" class="w-full bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400">
+                <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
+                <div id="timesheetSection" class="animate-in fade-in duration-300 space-y-4">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
+                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">View & Edit Attendance Sheet</h3>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="yearSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400"><option>2026</option></select>
+                            <select id="monthSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400">
                                 <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
                                 <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
                                 <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
                                 <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div id="chartMetricWrap" class="mb-4">
-                        <select id="chartMetric" class="w-full bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
-                            <option value="normal">Normal OT (Hours)</option>
-                            <option value="special">Special OT (Hours)</option>
-                            <option value="lieu">Lieu Days</option>
-                            <option value="nopay">No-Pay Days</option>
+                        <select id="adminUserSelect" onchange="loadSelectedUserSheet();" class="w-full bg-blue-50 hover:bg-blue-100 transition-colors text-blue-700 border-2 border-blue-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-blue-400 mb-4">
+                            <!-- Dropdown dynamically loads -->
                         </select>
+                        <div id="totalHrs" class="text-slate-400 text-center text-[10px] md:text-xs font-bold uppercase py-2 bg-slate-50 rounded-xl border border-dashed">Select an employee to run summary analysis.</div>
                     </div>
-
-                    <button onclick="loadAnalyticsData()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg mb-6 tracking-widest">Generate Chart</button>
-                    
-                    <!-- Chart Container -->
-                    <div class="relative w-full h-[280px] md:h-[400px] border-2 border-slate-100 rounded-[2rem] bg-slate-50 p-4 flex items-center justify-center shadow-inner">
-                        <div id="chartMessage" class="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Select Options & Generate</div>
-                        <canvas id="otChart" class="hidden w-full h-full"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
-            <div id="timesheetSection" class="animate-in fade-in duration-300 space-y-4">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">View & Edit Attendance Sheet</h3>
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="yearSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400"><option>2026</option></select>
-                        <select id="monthSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400">
-                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                        </select>
-                    </div>
-                    <select id="adminUserSelect" onchange="loadSelectedUserSheet();" class="w-full bg-blue-50 hover:bg-blue-100 transition-colors text-blue-700 border-2 border-blue-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-blue-400 mb-4">
-                        <!-- Dropdown dynamically loads -->
-                    </select>
-                    <div id="totalHrs" class="text-slate-400 text-center text-[10px] md:text-xs font-bold uppercase py-2 bg-slate-50 rounded-xl border border-dashed">Select an employee to run summary analysis.</div>
-                </div>
-                <div id="sheetContainer" class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
-            </div>
-
-            <!-- SECTION: WEEKLY TIME CHECK -->
-            <div id="weeklySection" class="hidden animate-in fade-in duration-300">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
-                    <h3 class="text-[10px] md:text-xs font-black text-indigo-600 uppercase mb-4 tracking-wider">Weekly Time Check Calculator</h3>
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="weeklyYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-indigo-400"><option>2026</option></select>
-                        <select id="weeklyMonth" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-indigo-400">
-                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                        </select>
-                    </div>
-                    <select id="weeklyUserSelect" class="w-full bg-indigo-50 hover:bg-indigo-100 transition-colors text-indigo-700 border-2 border-indigo-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-indigo-400 mb-4">
-                        <!-- Dropdown dynamically loads -->
-                    </select>
-                    <button onclick="runWeeklyCheck()" class="w-full bg-indigo-600 hover:bg-indigo-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Calculate Weekly Time</button>
-                </div>
-                <div id="weeklyResultContainer" class="space-y-3"></div>
-            </div>
-
-            <!-- SECTION 6: AUTOMATED AUDITOR TAB -->
-            <div id="auditSection" class="hidden animate-in fade-in duration-300">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
-                    <h3 class="text-[10px] md:text-xs font-black text-emerald-600 uppercase mb-4 tracking-wider">Automated Sheet Auditor (Rules Checker)</h3>
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="auditYear" onchange="clearAuditView();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-emerald-400"><option>2026</option></select>
-                        <select id="auditMonth" onchange="clearAuditView();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-emerald-400">
-                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                        </select>
-                    </div>
-                    <select id="auditUserSelect" onchange="clearAuditView();" class="w-full bg-emerald-50 hover:bg-emerald-100 transition-colors text-emerald-700 border-2 border-emerald-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-emerald-400 mb-4">
-                        <!-- Dynamic Loading Dropdown -->
-                    </select>
-                    <button onclick="runAuditCheck()" class="w-full bg-emerald-600 hover:bg-emerald-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Check Sheet Rules</button>
-                </div>
-                <div id="auditResultContainer" class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm max-h-[500px] overflow-y-auto"></div>
-            </div>
-
-            <!-- SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
-            <div id="configSection" class="hidden animate-in fade-in duration-300">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
-                    <h3 class="text-[10px] md:text-xs font-black text-purple-600 uppercase mb-4 tracking-wider">Manage Leaves & Holidays For Employees</h3>
-                    
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="configYearSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-purple-400"><option>2026</option></select>
-                        <select id="configMonthSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-purple-400">
-                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                        </select>
-                    </div>
-
-                    <select id="configUserSelect" onchange="loadSelectedUserConfig();" class="w-full bg-purple-50 hover:bg-purple-100 transition-colors text-purple-700 border-2 border-purple-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-purple-400 mb-6">
-                        <!-- Dropdown -->
-                    </select>
-
-                    <div class="md:grid md:grid-cols-2 md:gap-6">
-                        <!-- Holiday Form Split -->
-                        <div class="border-t md:border-t-0 md:border-r border-slate-100 pt-4 md:pt-0 md:pr-6 mb-4 md:mb-0">
-                            <label class="block text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-2">Add Custom Holiday</label>
-                            <div class="flex flex-col gap-3">
-                                <input type="date" id="configHolidayInput" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-purple-400 transition-colors w-full">
-                                <button onclick="adminAddHoliday()" class="bg-purple-600 hover:bg-purple-700 transition-colors text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-md">Add Holiday</button>
-                            </div>
-                        </div>
-
-                        <!-- Leave Form Split -->
-                        <div class="border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
-                            <label class="block text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-2">Record Approved Employee Leave</label>
-                            <input type="date" id="configLeaveDate" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-blue-400 transition-colors mb-3">
-                            <div class="grid grid-cols-2 gap-2 md:gap-3 mb-4">
-                                <select id="configLeaveType" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold outline-none cursor-pointer focus:border-blue-400 transition-colors">
-                                    <option>Full Leave</option><option>Half Day</option><option>Short Leave</option><option>Lieu Leave</option>
-                                </select>
-                                <select id="configLeaveSlot" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold outline-none cursor-pointer focus:border-blue-400 transition-colors">
-                                    <option>Full Day</option><option>Morning</option><option>Evening</option>
-                                </select>
-                            </div>
-                            <button onclick="adminSaveLeave()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-md">Save/Update Leave</button>
-                        </div>
-                    </div>
+                    <div id="sheetContainer" class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
                 </div>
 
-                <!-- Two Columns for Display Logs -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div class="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h4 class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-3">Active Holidays</h4>
-                        <div id="configHolidayList" class="max-h-[220px] overflow-y-auto pr-2 space-y-2"></div>
-                    </div>
-                    <div class="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h4 class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-3">Active Month Leaves</h4>
-                        <div id="configLeaveList" class="max-h-[220px] overflow-y-auto pr-2 space-y-2"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 2: BULK MONTHLY REPORT GENERATOR -->
-            <div id="reportSection" class="hidden animate-in fade-in duration-300">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">Select Target Month</h3>
-                    <div class="flex gap-3 mb-6">
-                        <select id="repYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm flex-1 font-bold outline-none cursor-pointer focus:border-green-400"><option>2026</option></select>
-                        <select id="repMonth" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm flex-1 font-bold outline-none cursor-pointer focus:border-green-400">
-                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                        </select>
-                    </div>
-                    <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-3 tracking-wider">Check Employees to include</h3>
-                    <div id="userCheckboxContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[300px] md:max-h-[400px] overflow-y-auto mb-6 p-3 border-2 border-dashed border-slate-200 rounded-[1.5rem] bg-slate-50/50">
-                        <!-- Checkboxes inject dynamically -->
-                    </div>
-                    <button onclick="generateMonthlySummaryReport()" class="w-full bg-green-500 hover:bg-green-600 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Generate Summary Report</button>
-                </div>
-            </div>
-
-            <!-- SECTION 5: MANUAL NO-PAY MANAGEMENT TAB -->
-            <div id="noPaySection" class="hidden animate-in fade-in duration-300 space-y-4">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-[10px] md:text-xs font-black text-red-500 uppercase mb-4 tracking-wider">Manual No-Pay Entry Form</h3>
-                    
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <select id="noPayYearSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400"><option>2026</option></select>
-                        <select id="noPayMonthSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400">
-                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                        </select>
-                    </div>
-
-                    <select id="noPayUserSelect" onchange="loadSelectedUserNoPay();" class="w-full bg-red-50 hover:bg-red-100 transition-colors text-red-700 border-2 border-red-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-red-400 mb-4">
-                        <!-- Dropdown dynamically loads -->
-                    </select>
-
-                    <div class="md:grid md:grid-cols-2 md:gap-4 mb-5">
-                        <div class="mb-3 md:mb-0">
-                            <label class="block text-[8px] md:text-[10px] font-black text-slate-400 uppercase mb-1.5">Select Date</label>
-                            <input type="date" id="noPayDateInput" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-red-400 transition-colors">
-                        </div>
-                        <div>
-                            <label class="block text-[8px] md:text-[10px] font-black text-slate-400 uppercase mb-1.5">No-Pay Type/Value</label>
-                            <select id="noPayAmountSelect" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400 transition-colors">
-                                <option value="1.0">FULL DAY (1.0)</option>
-                                <option value="0.5">HALF DAY (0.5)</option>
+                <!-- SECTION: WEEKLY TIME CHECK -->
+                <div id="weeklySection" class="hidden animate-in fade-in duration-300">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
+                        <h3 class="text-[10px] md:text-xs font-black text-indigo-600 uppercase mb-4 tracking-wider">Weekly Time Check Calculator</h3>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="weeklyYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-indigo-400"><option>2026</option></select>
+                            <select id="weeklyMonth" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-indigo-400">
+                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
                             </select>
                         </div>
+                        <select id="weeklyUserSelect" class="w-full bg-indigo-50 hover:bg-indigo-100 transition-colors text-indigo-700 border-2 border-indigo-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-indigo-400 mb-4">
+                            <!-- Dropdown dynamically loads -->
+                        </select>
+                        <button onclick="runWeeklyCheck()" class="w-full bg-indigo-600 hover:bg-indigo-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Calculate Weekly Time</button>
                     </div>
-
-                    <button onclick="saveManualNoPay()" class="w-full bg-red-600 hover:bg-red-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Save No-Pay Record</button>
+                    <div id="weeklyResultContainer" class="space-y-3"></div>
                 </div>
 
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4">Recorded No-Pay Log for Selected Month</h3>
-                    <div id="noPayListContainer" class="md:grid md:grid-cols-2 md:gap-3 max-h-[300px] overflow-y-auto pr-2 space-y-2 md:space-y-0">
-                        <!-- Dynamic List Injects here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
-            <div id="employeeSection" class="hidden animate-in fade-in duration-300 space-y-4">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/30 to-white">
-                    <h3 class="text-[10px] md:text-xs font-black text-purple-600 uppercase mb-4 tracking-wider">Head of the Department Profile</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4">
-                        <input type="text" id="hodName" placeholder="FULL NAME (E.G., A.B.C. PERERA)" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-purple-400 transition-colors">
-                        <input type="text" id="hodPosition" placeholder="POSITION (E.G., QUALITY ASSURANCE MANAGER)" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-purple-400 transition-colors">
-                    </div>
-                    <button onclick="saveHODDetails()" class="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white py-4 md:py-5 rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Update HOD Profile</button>
-                </div>
-
-                <div class="md:grid md:grid-cols-12 md:gap-4">
-                    <div class="md:col-span-5 bg-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4 md:mb-0 h-fit">
-                        <h3 id="formTitle" class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">Add New Employee</h3>
-                        <div class="space-y-3 md:space-y-4 mb-5">
-                            <input type="text" id="empEpf" placeholder="EPF NUMBER" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-blue-400 transition-colors">
-                            <input type="text" id="empName" placeholder="FULL NAME" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-blue-400 transition-colors">
-                            <input type="email" id="empEmail" placeholder="REGISTERED GOOGLE EMAIL" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none text-slate-600 focus:border-blue-400 transition-colors">
+                <!-- SECTION 6: AUTOMATED AUDITOR TAB -->
+                <div id="auditSection" class="hidden animate-in fade-in duration-300">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
+                        <h3 class="text-[10px] md:text-xs font-black text-emerald-600 uppercase mb-4 tracking-wider">Automated Sheet Auditor (Rules Checker)</h3>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="auditYear" onchange="clearAuditView();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-emerald-400"><option>2026</option></select>
+                            <select id="auditMonth" onchange="clearAuditView();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-emerald-400">
+                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                            </select>
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <button id="saveBtn" onclick="saveEmployeeDetails()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Save Employee profile</button>
-                            <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-full bg-slate-200 hover:bg-slate-300 transition-colors text-slate-600 py-3 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm uppercase tracking-wider mt-1">Cancel Edit</button>
+                        <select id="auditUserSelect" onchange="clearAuditView();" class="w-full bg-emerald-50 hover:bg-emerald-100 transition-colors text-emerald-700 border-2 border-emerald-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-emerald-400 mb-4">
+                            <!-- Dynamic Loading Dropdown -->
+                        </select>
+                        <button onclick="runAuditCheck()" class="w-full bg-emerald-600 hover:bg-emerald-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Check Sheet Rules</button>
+                    </div>
+                    <div id="auditResultContainer" class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm max-h-[500px] overflow-y-auto"></div>
+                </div>
+
+                <!-- SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
+                <div id="configSection" class="hidden animate-in fade-in duration-300">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
+                        <h3 class="text-[10px] md:text-xs font-black text-purple-600 uppercase mb-4 tracking-wider">Manage Leaves & Holidays For Employees</h3>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="configYearSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-purple-400"><option>2026</option></select>
+                            <select id="configMonthSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-purple-400">
+                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                            </select>
+                        </div>
+
+                        <select id="configUserSelect" onchange="loadSelectedUserConfig();" class="w-full bg-purple-50 hover:bg-purple-100 transition-colors text-purple-700 border-2 border-purple-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-purple-400 mb-6">
+                            <!-- Dropdown -->
+                        </select>
+
+                        <div class="md:grid md:grid-cols-2 md:gap-6">
+                            <!-- Holiday Form Split -->
+                            <div class="border-t md:border-t-0 md:border-r border-slate-100 pt-4 md:pt-0 md:pr-6 mb-4 md:mb-0">
+                                <label class="block text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-2">Add Custom Holiday</label>
+                                <div class="flex flex-col gap-3">
+                                    <input type="date" id="configHolidayInput" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-purple-400 transition-colors w-full">
+                                    <button onclick="adminAddHoliday()" class="bg-purple-600 hover:bg-purple-700 transition-colors text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-md">Add Holiday</button>
+                                </div>
+                            </div>
+
+                            <!-- Leave Form Split -->
+                            <div class="border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
+                                <label class="block text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-2">Record Approved Employee Leave</label>
+                                <input type="date" id="configLeaveDate" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-blue-400 transition-colors mb-3">
+                                <div class="grid grid-cols-2 gap-2 md:gap-3 mb-4">
+                                    <select id="configLeaveType" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold outline-none cursor-pointer focus:border-blue-400 transition-colors">
+                                        <option>Full Leave</option><option>Half Day</option><option>Short Leave</option><option>Lieu Leave</option>
+                                    </select>
+                                    <select id="configLeaveSlot" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold outline-none cursor-pointer focus:border-blue-400 transition-colors">
+                                        <option>Full Day</option><option>Morning</option><option>Evening</option>
+                                    </select>
+                                </div>
+                                <button onclick="adminSaveLeave()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-md">Save/Update Leave</button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="md:col-span-7 bg-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm h-full max-h-[500px] flex flex-col">
-                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider flex-shrink-0">System Registered Employees</h3>
-                        <div id="employeeListContainer" class="space-y-2 md:space-y-3 overflow-y-auto pr-2 flex-1">
-                            <!-- List items inject dynamically with Edit and Delete controls -->
+
+                    <!-- Two Columns for Display Logs -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm">
+                            <h4 class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-3">Active Holidays</h4>
+                            <div id="configHolidayList" class="max-h-[220px] overflow-y-auto pr-2 space-y-2"></div>
+                        </div>
+                        <div class="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm">
+                            <h4 class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-3">Active Month Leaves</h4>
+                            <div id="configLeaveList" class="max-h-[220px] overflow-y-auto pr-2 space-y-2"></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- SECTION 4: LOGIN LOGS HISTORY -->
-            <div id="logSection" class="hidden animate-in fade-in duration-300">
-                <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                    <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider">Recent System Login Logs</h3>
-                        <button onclick="loadLoginLogs()" class="text-blue-600 hover:bg-blue-100 transition-colors text-[9px] md:text-[10px] font-black uppercase bg-blue-50 px-3 py-1.5 md:py-2 rounded-lg border border-blue-200 shadow-sm">Refresh List</button>
-                    </div>
-                    <div id="logListContainer" class="max-h-[500px] overflow-y-auto pr-2 space-y-2 md:space-y-3">
-                        <!-- Log entries inject dynamically -->
+                <!-- SECTION 2: BULK MONTHLY REPORT GENERATOR -->
+                <div id="reportSection" class="hidden animate-in fade-in duration-300">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
+                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">Select Target Month</h3>
+                        <div class="flex gap-3 mb-6">
+                            <select id="repYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm flex-1 font-bold outline-none cursor-pointer focus:border-green-400"><option>2026</option></select>
+                            <select id="repMonth" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm flex-1 font-bold outline-none cursor-pointer focus:border-green-400">
+                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                            </select>
+                        </div>
+                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-3 tracking-wider">Check Employees to include</h3>
+                        <div id="userCheckboxContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[300px] md:max-h-[400px] overflow-y-auto mb-6 p-3 border-2 border-dashed border-slate-200 rounded-[1.5rem] bg-slate-50/50">
+                            <!-- Checkboxes inject dynamically -->
+                        </div>
+                        <button onclick="generateMonthlySummaryReport()" class="w-full bg-green-500 hover:bg-green-600 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Generate Summary Report</button>
                     </div>
                 </div>
-            </div>
 
+                <!-- SECTION 5: MANUAL NO-PAY MANAGEMENT TAB -->
+                <div id="noPaySection" class="hidden animate-in fade-in duration-300 space-y-4">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
+                        <h3 class="text-[10px] md:text-xs font-black text-red-500 uppercase mb-4 tracking-wider">Manual No-Pay Entry Form</h3>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <select id="noPayYearSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400"><option>2026</option></select>
+                            <select id="noPayMonthSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400">
+                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                            </select>
+                        </div>
+
+                        <select id="noPayUserSelect" onchange="loadSelectedUserNoPay();" class="w-full bg-red-50 hover:bg-red-100 transition-colors text-red-700 border-2 border-red-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-red-400 mb-4">
+                            <!-- Dropdown dynamically loads -->
+                        </select>
+
+                        <div class="md:grid md:grid-cols-2 md:gap-4 mb-5">
+                            <div class="mb-3 md:mb-0">
+                                <label class="block text-[8px] md:text-[10px] font-black text-slate-400 uppercase mb-1.5">Select Date</label>
+                                <input type="date" id="noPayDateInput" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-red-400 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-[8px] md:text-[10px] font-black text-slate-400 uppercase mb-1.5">No-Pay Type/Value</label>
+                                <select id="noPayAmountSelect" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400 transition-colors">
+                                    <option value="1.0">FULL DAY (1.0)</option>
+                                    <option value="0.5">HALF DAY (0.5)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button onclick="saveManualNoPay()" class="w-full bg-red-600 hover:bg-red-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Save No-Pay Record</button>
+                    </div>
+
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
+                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4">Recorded No-Pay Log for Selected Month</h3>
+                        <div id="noPayListContainer" class="md:grid md:grid-cols-2 md:gap-3 max-h-[300px] overflow-y-auto pr-2 space-y-2 md:space-y-0">
+                            <!-- Dynamic List Injects here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
+                <div id="employeeSection" class="hidden animate-in fade-in duration-300 space-y-4">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/30 to-white">
+                        <h3 class="text-[10px] md:text-xs font-black text-purple-600 uppercase mb-4 tracking-wider">Head of the Department Profile</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4">
+                            <input type="text" id="hodName" placeholder="FULL NAME (E.G., A.B.C. PERERA)" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-purple-400 transition-colors">
+                            <input type="text" id="hodPosition" placeholder="POSITION (E.G., QUALITY ASSURANCE MANAGER)" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-purple-400 transition-colors">
+                        </div>
+                        <button onclick="saveHODDetails()" class="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white py-4 md:py-5 rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Update HOD Profile</button>
+                    </div>
+
+                    <div class="md:grid md:grid-cols-12 md:gap-4">
+                        <div class="md:col-span-5 bg-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4 md:mb-0 h-fit">
+                            <h3 id="formTitle" class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">Add New Employee</h3>
+                            <div class="space-y-3 md:space-y-4 mb-5">
+                                <input type="text" id="empEpf" placeholder="EPF NUMBER" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-blue-400 transition-colors">
+                                <input type="text" id="empName" placeholder="FULL NAME" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-blue-400 transition-colors">
+                                <input type="email" id="empEmail" placeholder="REGISTERED GOOGLE EMAIL" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none text-slate-600 focus:border-blue-400 transition-colors">
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <button id="saveBtn" onclick="saveEmployeeDetails()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Save Employee profile</button>
+                                <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-full bg-slate-200 hover:bg-slate-300 transition-colors text-slate-600 py-3 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm uppercase tracking-wider mt-1">Cancel Edit</button>
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-7 bg-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm h-full max-h-[500px] flex flex-col">
+                            <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider flex-shrink-0">System Registered Employees</h3>
+                            <div id="employeeListContainer" class="space-y-2 md:space-y-3 overflow-y-auto pr-2 flex-1">
+                                <!-- List items inject dynamically with Edit and Delete controls -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 4: LOGIN LOGS HISTORY -->
+                <div id="logSection" class="hidden animate-in fade-in duration-300">
+                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                            <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider">Recent System Login Logs</h3>
+                            <button onclick="loadLoginLogs()" class="text-blue-600 hover:bg-blue-100 transition-colors text-[9px] md:text-[10px] font-black uppercase bg-blue-50 px-3 py-1.5 md:py-2 rounded-lg border border-blue-200 shadow-sm">Refresh List</button>
+                        </div>
+                        <div id="logListContainer" class="max-h-[500px] overflow-y-auto pr-2 space-y-2 md:space-y-3">
+                            <!-- Log entries inject dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 </body>
