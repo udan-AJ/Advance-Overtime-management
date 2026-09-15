@@ -70,22 +70,12 @@
             window.toggleChartControls(); 
         }
 
-        window.switchSection = (sectionId, btnElement) => {
+        window.switchSection = async (sectionId) => {
             ['timesheetSection', 'weeklySection', 'auditSection', 'configSection', 'reportSection', 'noPaySection', 'employeeSection', 'logSection', 'analyticsSection'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById(sectionId).classList.remove('hidden');
             
-            // Menu highlight logic for desktop
-            document.querySelectorAll('.admin-nav-btn').forEach(btn => {
-                btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
-                btn.classList.add('hover:bg-slate-50', 'text-slate-600', 'border-transparent');
-            });
-            if(btnElement) {
-                btnElement.classList.remove('hover:bg-slate-50', 'text-slate-600', 'border-transparent');
-                btnElement.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
-            }
-
             if(sectionId === 'logSection') {
-                loadLoginLogs();
+                await loadLoginLogs();
             }
         };
 
@@ -268,7 +258,7 @@
             container.innerHTML = "<div class='text-center p-4 text-xs text-slate-400 font-bold uppercase'>Fetching Login History...</div>";
             
             try {
-                const q = query(collection(db, "logs"), orderBy("time", "desc"), limit(20));
+                const q = query(collection(db, "logs"), orderBy("time", "desc"), limit(10));
                 const snap = await getDocs(q);
                 
                 container.innerHTML = "";
@@ -286,13 +276,13 @@
                     }
                     
                     const logRow = document.createElement('div');
-                    logRow.className = "flex justify-between items-center p-3 md:p-4 bg-slate-50 border border-slate-100 rounded-xl md:rounded-2xl text-xs font-bold mb-2 shadow-sm";
+                    logRow.className = "flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold mb-2 shadow-sm";
                     logRow.innerHTML = `
                         <div>
-                            <span class="text-emerald-600 font-black uppercase text-[11px] md:text-sm">${data.user ? data.user.split('@')[0] : 'USER'}</span>
-                            <p class="text-[9px] md:text-xs text-slate-400 font-normal mt-0.5">${data.user || ''} (${data.role || 'user'})</p>
+                            <span class="text-emerald-600 font-black uppercase">${data.user ? data.user.split('@')[0] : 'USER'}</span>
+                            <p class="text-[10px] text-slate-400 font-normal">${data.user || ''} (${data.role || 'user'})</p>
                         </div>
-                        <div class="text-right text-[9px] md:text-xs text-slate-500 font-bold bg-white border px-3 py-1.5 rounded-lg shadow-sm">
+                        <div class="text-right text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-1 rounded-lg">
                             ${formattedTime}
                         </div>
                     `;
@@ -356,7 +346,7 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();    
             const monthId = `${year}-${month + 1}`;    
             
-            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-xs md:text-sm font-bold uppercase tracking-widest'>Syncing Employee Sheet...</div>";    
+            container.innerHTML = "<div class='p-10 text-center text-slate-400 text-xs font-bold uppercase'>Syncing Employee Sheet...</div>";    
             const docSnap = await getDoc(doc(db, "users", activeTimesheetUid, "months", monthId));    
             const savedData = docSnap.exists() ? docSnap.data() : {};    
 
@@ -426,16 +416,16 @@
                 }
     
                 const row = document.createElement('div');    
-                row.className = `flex items-center gap-0.5 md:gap-3 p-2 md:p-3 border-b hover:bg-slate-50 transition-colors ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;    
+                row.className = `flex items-center gap-0.5 p-2 border-b ${isHoliday ? 'bg-red-50' : (dayOfWeek === 0 ? 'bg-orange-50' : 'bg-white')}`;    
                 row.innerHTML = `    
-                    <div class="w-8 md:w-12 text-center flex-shrink-0">    
-                        <span class="block text-[6px] md:text-[8px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
-                        <span class="text-xs md:text-lg font-black text-slate-700 leading-none">${d}</span>    
+                    <div class="w-7 text-center flex-shrink-0">    
+                        <span class="block text-[6px] font-bold text-slate-400 uppercase">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>    
+                        <span class="text-xs font-black text-slate-700 leading-none">${d}</span>    
                     </div>    
-                    <div class="flex-1 grid grid-cols-2 gap-1 md:gap-3 min-w-[80px]">    
+                    <div class="flex-1 grid grid-cols-2 gap-1 min-w-[80px]">    
                         <div class="flex flex-col gap-1">
-                            <input type="time" value="${dayData.in === '00:00' ? '' : dayData.in}" onchange="updateAdminCell('${d}', 'in', this.value)" class="p-1 md:p-1.5 rounded-lg border text-[9px] md:text-xs bg-white w-full text-center outline-none focus:border-blue-400">
-                            <select onchange="updateAdminCell('${d}', 'workType', this.value)" class="p-1 md:p-1.5 rounded-lg border text-[8px] md:text-[10px] bg-slate-50 w-full outline-none font-bold">
+                            <input type="time" value="${dayData.in === '00:00' ? '' : dayData.in}" onchange="updateAdminCell('${d}', 'in', this.value)" class="p-0.5 rounded border text-[9px] bg-white w-full text-center outline-none">
+                            <select onchange="updateAdminCell('${d}', 'workType', this.value)" class="p-0.5 rounded border text-[8px] bg-slate-50 w-full outline-none font-bold">
                                 <option value="">WORK</option>
                                 <option value="IR" ${dayData.workType === 'IR' ? 'selected' : ''}>IR</option>
                                 <option value="DR" ${dayData.workType === 'DR' ? 'selected' : ''}>DR</option>
@@ -444,20 +434,20 @@
                             </select>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <input type="time" value="${dayData.out === '00:00' ? '' : dayData.out}" onchange="updateAdminCell('${d}', 'out', this.value)" class="p-1 md:p-1.5 rounded-lg border text-[9px] md:text-xs bg-white w-full text-center outline-none focus:border-blue-400">
-                            <label class="flex items-center justify-center gap-1 cursor-pointer bg-red-50/50 p-1 rounded-lg border border-transparent hover:border-red-100">
-                                <input type="checkbox" ${dayData.isNextDay ? 'checked' : ''} onchange="updateAdminCell('${d}', 'isNextDay', this.checked)" class="w-2 h-2 md:w-3 md:h-3">
-                                <span class="text-[5px] md:text-[8px] text-red-500 uppercase font-black">Next Day</span>
+                            <input type="time" value="${dayData.out === '00:00' ? '' : dayData.out}" onchange="updateAdminCell('${d}', 'out', this.value)" class="p-0.5 rounded border text-[9px] bg-white w-full text-center outline-none">
+                            <label class="flex items-center justify-center gap-0.5 cursor-pointer">
+                                <input type="checkbox" ${dayData.isNextDay ? 'checked' : ''} onchange="updateAdminCell('${d}', 'isNextDay', this.checked)" class="w-2 h-2">
+                                <span class="text-[5px] text-red-500 uppercase font-black">Next Day</span>
                             </label>
                         </div>
                     </div>
-                    <div class="w-16 md:w-24 text-center text-[7px] md:text-[10px] font-bold border-x px-1 leading-tight flex-shrink-0">
-                        <p class="text-blue-600 truncate uppercase mb-0.5 md:mb-1">${leaveData ? leaveData.type.split(' ')[0] : '-'}</p>
-                        <div class="flex justify-between text-[6px] md:text-[9px] bg-slate-50 p-0.5 md:p-1 rounded"><span class="text-slate-500">W:${res.worked > 0 ? res.worked : '-'}</span><span class="text-red-500">R:${res.req}</span></div>
+                    <div class="w-16 text-center text-[7px] font-bold border-x px-0.5 leading-tight flex-shrink-0">
+                        <p class="text-blue-600 truncate uppercase mb-0.5">${leaveData ? leaveData.type.split(' ')[0] : '-'}</p>
+                        <div class="flex justify-between text-[6px]"><span class="text-slate-400">W:${res.worked > 0 ? res.worked : '-'}</span><span class="text-red-500">R:${res.req}</span></div>
                     </div>    
-                    <div class="w-10 md:w-16 text-right flex-shrink-0 bg-slate-50 p-1 md:p-2 rounded-lg">    
-                        <div class="text-[8px] md:text-[11px] font-black text-blue-600">${res.ot > 0 ? res.ot : '-'}</div>
-                        <div class="text-[8px] md:text-[11px] font-black text-red-600 border-t border-slate-200 mt-0.5 pt-0.5">${res.sOT > 0 ? res.sOT : '-'}</div>
+                    <div class="w-10 text-right flex-shrink-0">    
+                        <div class="text-[8px] font-black text-blue-600">${res.ot > 0 ? res.ot : ''}</div>
+                        <div class="text-[8px] font-black text-red-600">${res.sOT > 0 ? res.sOT : ''}</div>
                     </div>    
                 `;    
                 container.appendChild(row);    
@@ -472,19 +462,16 @@
             currentCalcData = { year, monthName: document.getElementById('monthSelect').options[month].text, daysInMonth, deductionDays, weekendCount: wC, holidayCount: hC, fullLeaveCount: fLC, halfDayCount: hDC, tShouldWork, tNormalOT, tSpecialOT, tLieuDays, earnedLieuDays, takenLieuDays, workingDays: (daysInMonth - deductionDays), monthId };
 
             document.getElementById('totalHrs').innerHTML = `
-                <div class="grid grid-cols-2 gap-2 text-[10px] md:text-[13px] bg-blue-50 p-3 md:p-5 rounded-2xl border border-blue-100 font-bold mb-3 md:mb-4 text-slate-700 shadow-inner">
-                    <div>Normal Worked: <span class="text-blue-600 font-black">${tNormalHrs.toFixed(1)}</span></div>
-                    <div>Should Work: <span class="text-slate-800 font-black">${tShouldWork.toFixed(1)}</span></div>
-                    <div class="text-blue-700 mt-1">Normal OT: <span class="font-black text-xs md:text-sm bg-white px-2 py-1 rounded shadow-sm border ml-1">${tNormalOT.toFixed(1)}</span></div>
-                    <div class="text-red-600 mt-1">Special OT: <span class="font-black text-xs md:text-sm bg-white px-2 py-1 rounded shadow-sm border border-red-100 ml-1">${tSpecialOT.toFixed(1)}</span></div>
-                    <div class="text-indigo-600 col-span-2 border-t border-blue-200 pt-2 mt-2 flex justify-between items-center">
-                        <span class="uppercase tracking-wider">Lieu Days Balance</span> 
-                        <span class="text-lg md:text-xl font-black bg-white px-3 py-1 rounded-lg shadow-sm border">${tLieuDays} 
-                            ${takenLieuDays > 0 ? `<span class="text-[9px] md:text-xs text-indigo-400 font-bold ml-2">(${earnedLieuDays} Earned - ${takenLieuDays} Taken)</span>` : ''}
-                        </span>
+                <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-3 rounded-2xl border font-bold mb-2">
+                    <div>Normal Worked: <span class="text-blue-600">${tNormalHrs.toFixed(1)}</span></div>
+                    <div>Should Work: <span class="text-slate-700">${tShouldWork.toFixed(1)}</span></div>
+                    <div class="text-blue-600">Normal OT: <span class="font-black text-xs">${tNormalOT.toFixed(1)}</span></div>
+                    <div class="text-red-500">Special OT: <span class="font-black text-xs">${tSpecialOT.toFixed(1)}</span></div>
+                    <div class="text-purple-600 col-span-2 border-t pt-1">
+                        Total Lieu Days: <span>${tLieuDays} ${takenLieuDays > 0 ? `<span class="text-[9px] text-purple-400 font-normal ml-1">(${earnedLieuDays} - ${takenLieuDays})</span>` : ''}</span>
                     </div>
                 </div>
-                <button onclick="printSelectedUserReport()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white font-black text-xs md:text-sm py-3 md:py-4 rounded-xl md:rounded-2xl uppercase shadow-lg tracking-wider">Download Employee Report (PDF)</button>
+                <button onclick="printSelectedUserReport()" class="w-full bg-blue-600 text-white font-black text-xs py-2.5 rounded-xl uppercase shadow-sm tracking-wide border border-blue-700">Print Employee Report (PDF)</button>
             `;    
         }
 
@@ -505,7 +492,7 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const container = document.getElementById('weeklyResultContainer');
 
-            container.innerHTML = "<div class='p-6 text-center text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest'>Calculating Weekly Data...</div>";
+            container.innerHTML = "<div class='p-6 text-center text-xs font-bold text-slate-400 uppercase tracking-widest'>Calculating Weekly Data...</div>";
 
             const docSnap = await getDoc(doc(db, "users", uid, "months", monthId));
             const savedData = docSnap.exists() ? docSnap.data() : {};
@@ -566,10 +553,6 @@
 
             container.innerHTML = "";
 
-            const wrapper = document.createElement('div');
-            wrapper.className = "md:grid md:grid-cols-2 md:gap-4 space-y-3 md:space-y-0";
-            container.appendChild(wrapper);
-
             weeks.forEach((weekDays, index) => {
                 if(weekDays.length === 0) return;
 
@@ -601,32 +584,31 @@
                 let difference = totalNormalWorked - requiredHours;
 
                 const card = document.createElement('div');
-                card.className = "bg-white p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border shadow-sm hover:shadow-md transition-shadow";
+                card.className = "bg-white p-4 rounded-[1.5rem] border shadow-sm mb-3";
                 
-                let diffColor = difference >= 0 ? "text-emerald-600" : "text-red-600";
+                let diffColor = difference >= 0 ? "text-emerald-500" : "text-red-500";
                 let diffText = difference > 0 ? `+${difference.toFixed(1)} Hrs` : `${difference.toFixed(1)} Hrs`;
-                let statusBadge = difference >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200";
+                let statusBadge = difference >= 0 ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100";
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-center mb-3 border-b pb-3">
-                        <h4 class="font-black text-indigo-600 uppercase text-xs md:text-sm tracking-wide">Week ${index + 1} <span class="text-[9px] md:text-[10px] text-slate-400 block md:inline md:ml-1 font-bold">(${weekDays[0]} - ${weekDays[weekDays.length-1]})</span></h4>
-                        <span class="font-black text-[10px] md:text-xs ${diffColor} ${statusBadge} px-3 py-1.5 rounded-lg border shadow-sm">${diffText}</span>
+                    <div class="flex justify-between items-center mb-2 border-b pb-2">
+                        <h4 class="font-black text-indigo-600 uppercase text-xs">Week ${index + 1} <span class="text-[9px] text-slate-400">(${weekDays[0]} to ${weekDays[weekDays.length-1]})</span></h4>
+                        <span class="font-black text-[10px] ${diffColor} ${statusBadge} px-2.5 py-1.5 rounded-lg border">${diffText}</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] md:text-xs font-bold text-slate-600">
-                        <div class="flex justify-between bg-slate-50 p-1.5 rounded"><span>Days:</span> <span class="text-slate-800">${totalDays}</span></div>
-                        <div class="flex justify-between bg-slate-50 p-1.5 rounded"><span>Weekends:</span> <span class="text-slate-400">-${weekends}</span></div>
-                        <div class="flex justify-between bg-slate-50 p-1.5 rounded"><span>Hols (W/D):</span> <span class="text-slate-400">-${weekdayHolidays}</span></div>
-                        <div class="flex justify-between bg-slate-50 p-1.5 rounded"><span>Leaves:</span> <span class="text-slate-400">-${leaveDeductions}</span></div>
-                        
-                        <div class="col-span-2 border-t pt-2 mt-1 flex justify-between text-blue-700 bg-blue-50/50 p-2 rounded-lg">
-                            <span>Req. Work (${requiredWorkingDays} D x 9):</span> <span class="font-black">${requiredHours} Hrs</span>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-bold text-slate-600">
+                        <div class="flex justify-between"><span>Total Days:</span> <span>${totalDays}</span></div>
+                        <div class="flex justify-between"><span>Weekends:</span> <span class="text-slate-400">-${weekends}</span></div>
+                        <div class="flex justify-between"><span>Holidays (W/D):</span> <span class="text-slate-400">-${weekdayHolidays}</span></div>
+                        <div class="flex justify-between"><span>Leaves:</span> <span class="text-slate-400">-${leaveDeductions}</span></div>
+                        <div class="col-span-2 border-t pt-1.5 mt-1 flex justify-between text-blue-600">
+                            <span>Req. Work (${requiredWorkingDays} Days x 9):</span> <span>${requiredHours} Hrs</span>
                         </div>
-                        <div class="col-span-2 flex justify-between text-slate-800 bg-slate-100 p-2 rounded-lg">
-                            <span>Actual Normal Work:</span> <span class="font-black">${totalNormalWorked.toFixed(1)} Hrs</span>
+                        <div class="col-span-2 flex justify-between text-slate-800">
+                            <span>Actual Normal Worked:</span> <span>${totalNormalWorked.toFixed(1)} Hrs</span>
                         </div>
                     </div>
                 `;
-                wrapper.appendChild(card);
+                container.appendChild(card);
             });
         };
 
@@ -720,26 +702,26 @@
         function renderEmployeeList() {
             const container = document.getElementById('employeeListContainer');
             container.innerHTML = allUsers.map(u => `
-                <div class="flex justify-between items-center p-3 md:p-4 bg-white border rounded-xl md:rounded-2xl text-xs md:text-sm font-bold mb-2 shadow-sm hover:border-purple-200 transition-colors">
+                <div class="flex justify-between items-center p-2.5 bg-white border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
                     <div>
-                        <span class="text-blue-600 font-black">[EPF: ${u.epf}]</span> <span class="text-slate-700">${u.name.toUpperCase()}</span>
-                        <p class="text-[10px] md:text-xs font-normal text-slate-400 mt-0.5">${u.email}</p>
+                        <span class="text-blue-600 font-black">[EPF: ${u.epf}]</span> ${u.name.toUpperCase()}
+                        <p class="text-[10px] text-slate-400 font-normal text-slate-500">${u.email}</p>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="editEmployee('${u.id}', '${u.epf}', '${u.name}', '${u.email}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase border border-blue-100 transition-colors">Edit</button>
-                        <button onclick="deleteEmployee('${u.id}', '${u.name}')" class="bg-red-50 hover:bg-red-100 text-red-500 px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase border border-red-100 transition-colors">Del</button>
+                    <div class="flex gap-1">
+                        <button onclick="editEmployee('${u.id}', '${u.epf}', '${u.name}', '${u.email}')" class="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-100">Edit</button>
+                        <button onclick="deleteEmployee('${u.id}', '${u.name}')" class="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-red-100">Delete</button>
                     </div>
                 </div>
-            `).join('') || `<p class="text-slate-400 text-center text-[10px] md:text-xs py-4">No employees found.</p>`;
+            `).join('') || `<p class="text-slate-400 text-center text-[10px]">No employees found.</p>`;
         }
 
         function renderReportUserSelection() {
             const container = document.getElementById('userCheckboxContainer');
             container.innerHTML = allUsers.map(u => `
-                <label class="flex items-center gap-3 p-3 md:p-4 bg-white rounded-xl md:rounded-2xl border border-slate-200 cursor-pointer hover:bg-slate-50 hover:border-green-300 transition-all shadow-sm">
-                    <input type="checkbox" value="${u.id}" class="emp-checkbox w-4 h-4 md:w-5 md:h-5 rounded text-green-600 focus:ring-green-500">
-                    <div class="text-xs md:text-sm font-bold">
-                        <span class="text-slate-400">[${u.epf}]</span> <span class="text-slate-700">${u.name.toUpperCase()}</span>
+                <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
+                    <input type="checkbox" value="${u.id}" class="emp-checkbox w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
+                    <div class="text-xs font-bold">
+                        <span class="text-slate-500">[${u.epf}]</span> ${u.name.toUpperCase()}
                     </div>
                 </label>
             `).join('');
@@ -817,19 +799,19 @@
             const entries = Object.entries(manualNoPays).sort((a,b) => parseInt(a[0]) - parseInt(b[0]));
             
             if(entries.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 text-center text-[10px] md:text-xs py-4">No manual no-pay records found for this month.</p>`;
+                container.innerHTML = `<p class="text-slate-400 text-center text-[10px] py-4">No manual no-pay records found for this month.</p>`;
                 return;
             }
             
             entries.forEach(([day, value]) => {
                 const logRow = document.createElement('div');
-                logRow.className = "flex justify-between items-center p-3 md:p-4 bg-white border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold mb-2 shadow-sm hover:border-red-200";
+                logRow.className = "flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold mb-2 shadow-sm";
                 logRow.innerHTML = `
                     <div>
-                        <span class="text-red-600 font-black uppercase md:text-sm">Day ${day}</span>
-                        <p class="text-[10px] md:text-xs text-slate-500 font-bold mt-0.5 bg-slate-50 px-2 py-0.5 rounded border inline-block">Amount: ${value} Day(s)</p>
+                        <span class="text-red-600 font-black uppercase">Day ${day}</span>
+                        <p class="text-[10px] text-slate-400 font-normal">Amount: ${value} Day(s)</p>
                     </div>
-                    <button onclick="deleteNoPayRecord('${day}')" class="text-red-500 hover:text-white hover:bg-red-500 text-[9px] md:text-xs font-black uppercase bg-red-50 px-3 py-1.5 md:py-2 rounded-lg border border-red-100 transition-colors">Remove</button>
+                    <button onclick="deleteNoPayRecord('${day}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">Delete</button>
                 `;
                 container.appendChild(logRow);
             });
@@ -884,7 +866,7 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();    
             const monthId = `${year}-${month + 1}`;
 
-            container.innerHTML = "<div class='p-8 text-center text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest'>Analyzing Sheet Rules...</div>";
+            container.innerHTML = "<div class='p-6 text-center text-xs font-bold text-slate-400 uppercase tracking-widest'>Analyzing Sheet Rules...</div>";
 
             const docSnap = await getDoc(doc(db, "users", uid, "months", monthId));    
             const savedData = docSnap.exists() ? docSnap.data() : {};   
@@ -896,30 +878,26 @@
             const results = validateMonthSheet(savedData, hList, lList, daysInMonth, year, month);
 
             container.innerHTML = "";
-            const wrapper = document.createElement('div');
-            wrapper.className = "md:grid md:grid-cols-2 md:gap-3 space-y-2 md:space-y-0 p-2 md:p-3";
-            container.appendChild(wrapper);
-
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateObj = new Date(year, month, d);
                 const res = results[d] || { status: "OK", msg: "Passed" };
                 
                 const row = document.createElement('div');
-                row.className = `flex justify-between items-center p-3 md:p-4 rounded-xl border text-xs md:text-sm font-bold shadow-sm hover:shadow-md transition-shadow ${res.status === 'ERROR' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`;
+                row.className = `flex justify-between items-center p-3 border-b text-xs font-bold ${res.status === 'ERROR' ? 'bg-red-50/70 border-red-100' : 'bg-white'}`;
                 
                 row.innerHTML = `
                     <div>
-                        <span class="text-slate-400 text-[8px] md:text-[10px] uppercase block leading-none mb-1 font-black tracking-wider">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                        <span class="text-slate-700 font-black">Day ${d}</span>
+                        <span class="text-slate-400 text-[7px] uppercase block leading-none mb-0.5">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                        <span class="text-slate-800 font-black">Day ${d}</span>
                     </div>
                     <div class="text-right">
-                        <span class="px-2.5 py-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-wider shadow-sm ${res.status === 'ERROR' ? 'bg-red-500 text-white border border-red-600' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}">
+                        <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${res.status === 'ERROR' ? 'bg-red-100 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}">
                             ${res.status}
                         </span>
-                        <p class="text-[9px] md:text-[10px] ${res.status === 'ERROR' ? 'text-red-500 font-bold' : 'text-slate-400 font-normal'} mt-1.5 md:mt-2 bg-white px-2 py-0.5 rounded border inline-block">${res.msg}</p>
+                        <p class="text-[9px] ${res.status === 'ERROR' ? 'text-red-500 font-bold' : 'text-slate-400 font-normal'} mt-0.5">${res.msg}</p>
                     </div>
                 `;
-                wrapper.appendChild(row);
+                container.appendChild(row);
             }
         };
 
@@ -965,11 +943,11 @@
 
         function renderConfigHolidayList() {
             document.getElementById('configHolidayList').innerHTML = configHolidays.map(d => `
-                <div class="flex justify-between items-center p-3 md:p-4 bg-white border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold mb-2 shadow-sm hover:border-purple-200">
+                <div class="flex justify-between items-center p-2.5 bg-slate-50 border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
                     <span class="text-slate-700">${d}</span>
-                    <button onclick="adminRemoveHoliday('${d}')" class="text-red-500 text-[9px] md:text-xs font-black uppercase hover:bg-red-500 hover:text-white px-3 py-1.5 md:py-2 rounded-lg border border-red-200 transition-colors">Remove</button>
+                    <button onclick="adminRemoveHoliday('${d}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2 rounded-lg border">Remove</button>
                 </div>
-            `).join('') || `<p class="text-slate-400 text-center text-[10px] md:text-xs py-4">No Holidays Recorded.</p>`;
+            `).join('') || `<p class="text-slate-400 text-center text-[10px] py-2">No Holidays Recorded.</p>`;
         }
 
         window.adminSaveLeave = async () => {
@@ -1005,356 +983,336 @@
             await setDoc(doc(db, "users", activeConfigUid, "leaves", monthId), configLeaves);
             alert("Leave deleted!");
             await loadConfigLeaves();
-        }
+        };
 
         function renderConfigLeaveList() {
             document.getElementById('configLeaveList').innerHTML = Object.entries(configLeaves).map(([day, data]) => `
-                <div class="flex justify-between items-center p-3 md:p-4 bg-white border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold mb-2 shadow-sm hover:border-purple-200">
+                <div class="flex justify-between items-center p-2.5 bg-slate-50 border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
                     <div>
                         <span class="text-blue-600 font-black block">Day ${day}</span>
-                        <p class="text-[10px] md:text-xs text-slate-500 font-normal mt-0.5 bg-slate-50 px-2 py-0.5 rounded border inline-block">${data.type} (${data.slot})</p>
+                        <p class="text-[10px] text-slate-400 font-normal">${data.type} (${data.slot})</p>
                     </div>
-                    <button onclick="adminDeleteLeave('${day}')" class="text-red-500 text-[9px] md:text-xs font-black uppercase hover:bg-red-500 hover:text-white px-3 py-1.5 md:py-2 rounded-lg border border-red-200 transition-colors">Delete</button>
+                    <button onclick="adminDeleteLeave('${day}')" class="text-red-500 text-[9px] font-black uppercase bg-red-50 px-2 rounded-lg border">Delete</button>
                 </div>
-            `).join('') || `<p class="text-slate-400 text-center text-[10px] md:text-xs py-4">No Leaves Recorded for this month.</p>`;
+            `).join('') || `<p class="text-slate-400 text-center text-[10px] py-2">No Leaves Recorded for this month.</p>`;
         }
 
         window.logout = logout;
         window.loadLoginLogs = loadLoginLogs;
     </script>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-900 pb-12 font-sans selection:bg-blue-200">
+<body class="bg-slate-100 min-h-screen text-slate-900 pb-12 font-sans">
     
     <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center">
-        <div class="bg-white p-6 md:p-8 rounded-3xl font-black text-sm md:text-base uppercase tracking-widest text-blue-600 shadow-2xl flex items-center gap-3">
-            <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            Processing Summaries...
-        </div>
+        <div class="bg-white p-5 rounded-2xl font-bold text-xs uppercase tracking-widest text-blue-600 shadow-2xl">Processing Summaries...</div>
     </div>
 
-    <!-- [නිවැරදි කළ තැන]: Hidden Wrapper එකක් දැම්මා -->
-    <div id="adminScreen" class="hidden">
-        <!-- PC Dashboard Layout Added -->
-        <div class="w-full max-w-7xl mx-auto p-3 md:p-6 md:flex md:gap-8 items-start">
-            
-            <!-- Sidebar (Left) -->
-            <div class="md:w-64 lg:w-72 flex-shrink-0 flex flex-col gap-3 md:gap-5 sticky top-0 md:top-6 z-30 shadow-sm md:shadow-none">
-                
-                <!-- Dashboard Header / Logout -->
-                <div class="bg-white p-4 md:p-6 md:rounded-3xl border-b md:border shadow-sm flex justify-between md:flex-col items-center md:items-start gap-4">
-                    <div>
-                        <h1 class="text-xs md:text-base font-black text-slate-800 uppercase tracking-tight">CIC Admin Board</h1>
-                        <p class="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase mt-0.5">Control Panel V2</p>
-                    </div>
-                    <button onclick="logout()" class="bg-red-50 hover:bg-red-100 transition-colors text-red-500 border border-red-100 px-4 py-2 md:py-2.5 md:w-full rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase">Secure Logout</button>
-                </div>
-
-                <!-- Dashboard Navigation -->
-                <div class="bg-white p-2 md:p-3 md:rounded-3xl border-b md:border flex flex-wrap md:flex-col gap-1 md:gap-1.5 text-center shadow-sm text-[8px] md:text-xs font-black uppercase tracking-wider">
-                    <button id="nav-timesheetSection" onclick="switchSection('timesheetSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 transition-all">Timesheets</button>
-                    <button id="nav-weeklySection" onclick="switchSection('weeklySection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Weekly Check</button>
-                    <button id="nav-analyticsSection" onclick="switchSection('analyticsSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Analytics</button> 
-                    <button id="nav-auditSection" onclick="switchSection('auditSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Auditor</button>
-                    <button id="nav-configSection" onclick="switchSection('configSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Manage Config</button>
-                    <button id="nav-reportSection" onclick="switchSection('reportSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Report</button>
-                    <button id="nav-noPaySection" onclick="switchSection('noPaySection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">No-Pay</button>
-                    <button id="nav-employeeSection" onclick="switchSection('employeeSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Employees</button>
-                    <button id="nav-logSection" onclick="switchSection('logSection', this)" class="admin-nav-btn flex-1 min-w-[55px] md:w-full md:text-left px-2 md:px-4 py-3 md:py-3.5 rounded-xl hover:bg-slate-50 text-slate-600 border border-transparent transition-all">Logs</button>
-                </div>
+    <div id="adminScreen" class="hidden max-w-xl mx-auto p-3">
+        <!-- Header -->
+        <div class="bg-white p-4 rounded-3xl border shadow-sm flex justify-between items-center mb-3">
+            <div>
+                <h1 class="text-sm font-black text-slate-800 uppercase tracking-tight">CIC Admin Dashboard</h1>
+                <p class="text-[9px] text-slate-400 font-bold uppercase">Control Panel & Reports</p>
             </div>
+            <button onclick="logout()" class="bg-red-50 text-red-500 border border-red-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase">Logout</button>
+        </div>
 
-            <!-- Right Content Panels -->
-            <div class="flex-1 w-full min-w-0 space-y-4 mt-3 md:mt-0">
+        <!-- 9 Tab Dynamic Menu System -->
+        <div class="bg-white p-1 rounded-2xl border flex flex-wrap gap-0.5 mb-3 text-center shadow-sm text-[7px] font-black uppercase tracking-wider">
+            <button onclick="switchSection('timesheetSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-100">Timesheets</button>
+            <button onclick="switchSection('weeklySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-indigo-600">Weekly Check</button>
+            <button onclick="switchSection('analyticsSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-blue-500 font-black border border-blue-100">Analytics</button> 
+            <button onclick="switchSection('auditSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Auditor</button>
+            <button onclick="switchSection('configSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Manage Config</button>
+            <button onclick="switchSection('reportSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Report</button>
+            <button onclick="switchSection('noPaySection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 text-red-600">No-Pay</button>
+            <button onclick="switchSection('employeeSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Employees</button>
+            <button onclick="switchSection('logSection')" class="flex-1 min-w-[55px] py-2.5 rounded-xl hover:bg-slate-50 text-slate-700">Logs</button>
+        </div>
+
+        <!-- NEW SECTION: VISUAL ANALYTICS (CHART.JS) -->
+        <div id="analyticsSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-blue-500 uppercase mb-3">Dynamic Employee Analytics</h3>
                 
-                <!-- SECTION: VISUAL ANALYTICS (CHART.JS) -->
-                <div id="analyticsSection" class="hidden animate-in fade-in duration-300">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h3 class="text-[10px] md:text-xs font-black text-blue-600 uppercase mb-4 tracking-wider">Dynamic Employee Analytics</h3>
-                        
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="chartTarget" onchange="toggleChartControls()" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
-                                <option value="all">All Employees</option>
-                                <option value="individual">Individual Employee</option>
-                            </select>
-                            <select id="chartTimeframe" onchange="toggleChartControls()" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
-                                <option value="monthly">Monthly Analysis</option>
-                                <option value="yearly">Yearly Analysis</option>
-                            </select>
-                        </div>
-
-                        <div id="chartEmployeeWrap" class="hidden mb-3">
-                            <select id="chartUserSelect" class="w-full bg-blue-50 border-2 border-blue-200 text-blue-700 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-blue-400">
-                                <!-- Dropdown dynamically loads -->
-                            </select>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="chartYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400"><option>2026</option></select>
-                            <div id="chartMonthWrap" class="w-full">
-                                <select id="chartMonth" class="w-full bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400">
-                                    <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                    <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                    <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                    <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div id="chartMetricWrap" class="mb-4">
-                            <select id="chartMetric" class="w-full bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none text-slate-700 cursor-pointer focus:border-blue-400">
-                                <option value="normal">Normal OT (Hours)</option>
-                                <option value="special">Special OT (Hours)</option>
-                                <option value="lieu">Lieu Days</option>
-                                <option value="nopay">No-Pay Days</option>
-                            </select>
-                        </div>
-
-                        <button onclick="loadAnalyticsData()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg mb-6 tracking-widest">Generate Chart</button>
-                        
-                        <!-- Chart Container -->
-                        <div class="relative w-full h-[280px] md:h-[400px] border-2 border-slate-100 rounded-[2rem] bg-slate-50 p-4 flex items-center justify-center shadow-inner">
-                            <div id="chartMessage" class="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Select Options & Generate</div>
-                            <canvas id="otChart" class="hidden w-full h-full"></canvas>
-                        </div>
-                    </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <select id="chartTarget" onchange="toggleChartControls()" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none text-slate-700">
+                        <option value="all">All Employees</option>
+                        <option value="individual">Individual Employee</option>
+                    </select>
+                    <select id="chartTimeframe" onchange="toggleChartControls()" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none text-slate-700">
+                        <option value="monthly">Monthly Analysis</option>
+                        <option value="yearly">Yearly Analysis</option>
+                    </select>
                 </div>
 
-                <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
-                <div id="timesheetSection" class="animate-in fade-in duration-300 space-y-4">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">View & Edit Attendance Sheet</h3>
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="yearSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400"><option>2026</option></select>
-                            <select id="monthSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-blue-400">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                            </select>
-                        </div>
-                        <select id="adminUserSelect" onchange="loadSelectedUserSheet();" class="w-full bg-blue-50 hover:bg-blue-100 transition-colors text-blue-700 border-2 border-blue-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-blue-400 mb-4">
-                            <!-- Dropdown dynamically loads -->
+                <div id="chartEmployeeWrap" class="hidden mb-2">
+                    <select id="chartUserSelect" class="w-full bg-blue-50 border-2 border-blue-200 text-blue-700 p-2.5 rounded-xl text-xs font-black outline-none">
+                        <!-- Dropdown dynamically loads -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <select id="chartYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <div id="chartMonthWrap" class="w-full">
+                        <select id="chartMonth" class="w-full bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                            <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                            <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                            <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                            <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
                         </select>
-                        <div id="totalHrs" class="text-slate-400 text-center text-[10px] md:text-xs font-bold uppercase py-2 bg-slate-50 rounded-xl border border-dashed">Select an employee to run summary analysis.</div>
-                    </div>
-                    <div id="sheetContainer" class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
-                </div>
-
-                <!-- SECTION: WEEKLY TIME CHECK -->
-                <div id="weeklySection" class="hidden animate-in fade-in duration-300">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
-                        <h3 class="text-[10px] md:text-xs font-black text-indigo-600 uppercase mb-4 tracking-wider">Weekly Time Check Calculator</h3>
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="weeklyYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-indigo-400"><option>2026</option></select>
-                            <select id="weeklyMonth" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-indigo-400">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                            </select>
-                        </div>
-                        <select id="weeklyUserSelect" class="w-full bg-indigo-50 hover:bg-indigo-100 transition-colors text-indigo-700 border-2 border-indigo-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-indigo-400 mb-4">
-                            <!-- Dropdown dynamically loads -->
-                        </select>
-                        <button onclick="runWeeklyCheck()" class="w-full bg-indigo-600 hover:bg-indigo-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Calculate Weekly Time</button>
-                    </div>
-                    <div id="weeklyResultContainer" class="space-y-3"></div>
-                </div>
-
-                <!-- SECTION 6: AUTOMATED AUDITOR TAB -->
-                <div id="auditSection" class="hidden animate-in fade-in duration-300">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
-                        <h3 class="text-[10px] md:text-xs font-black text-emerald-600 uppercase mb-4 tracking-wider">Automated Sheet Auditor (Rules Checker)</h3>
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="auditYear" onchange="clearAuditView();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-emerald-400"><option>2026</option></select>
-                            <select id="auditMonth" onchange="clearAuditView();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-emerald-400">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                            </select>
-                        </div>
-                        <select id="auditUserSelect" onchange="clearAuditView();" class="w-full bg-emerald-50 hover:bg-emerald-100 transition-colors text-emerald-700 border-2 border-emerald-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-emerald-400 mb-4">
-                            <!-- Dynamic Loading Dropdown -->
-                        </select>
-                        <button onclick="runAuditCheck()" class="w-full bg-emerald-600 hover:bg-emerald-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Check Sheet Rules</button>
-                    </div>
-                    <div id="auditResultContainer" class="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm max-h-[500px] overflow-y-auto"></div>
-                </div>
-
-                <!-- SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
-                <div id="configSection" class="hidden animate-in fade-in duration-300">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4">
-                        <h3 class="text-[10px] md:text-xs font-black text-purple-600 uppercase mb-4 tracking-wider">Manage Leaves & Holidays For Employees</h3>
-                        
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="configYearSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-purple-400"><option>2026</option></select>
-                            <select id="configMonthSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-purple-400">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                            </select>
-                        </div>
-
-                        <select id="configUserSelect" onchange="loadSelectedUserConfig();" class="w-full bg-purple-50 hover:bg-purple-100 transition-colors text-purple-700 border-2 border-purple-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-purple-400 mb-6">
-                            <!-- Dropdown -->
-                        </select>
-
-                        <div class="md:grid md:grid-cols-2 md:gap-6">
-                            <!-- Holiday Form Split -->
-                            <div class="border-t md:border-t-0 md:border-r border-slate-100 pt-4 md:pt-0 md:pr-6 mb-4 md:mb-0">
-                                <label class="block text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-2">Add Custom Holiday</label>
-                                <div class="flex flex-col gap-3">
-                                    <input type="date" id="configHolidayInput" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-purple-400 transition-colors w-full">
-                                    <button onclick="adminAddHoliday()" class="bg-purple-600 hover:bg-purple-700 transition-colors text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-md">Add Holiday</button>
-                                </div>
-                            </div>
-
-                            <!-- Leave Form Split -->
-                            <div class="border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
-                                <label class="block text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-2">Record Approved Employee Leave</label>
-                                <input type="date" id="configLeaveDate" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-blue-400 transition-colors mb-3">
-                                <div class="grid grid-cols-2 gap-2 md:gap-3 mb-4">
-                                    <select id="configLeaveType" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold outline-none cursor-pointer focus:border-blue-400 transition-colors">
-                                        <option>Full Leave</option><option>Half Day</option><option>Short Leave</option><option>Lieu Leave</option>
-                                    </select>
-                                    <select id="configLeaveSlot" class="p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs font-bold outline-none cursor-pointer focus:border-blue-400 transition-colors">
-                                        <option>Full Day</option><option>Morning</option><option>Evening</option>
-                                    </select>
-                                </div>
-                                <button onclick="adminSaveLeave()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-md">Save/Update Leave</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Two Columns for Display Logs -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div class="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm">
-                            <h4 class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-3">Active Holidays</h4>
-                            <div id="configHolidayList" class="max-h-[220px] overflow-y-auto pr-2 space-y-2"></div>
-                        </div>
-                        <div class="bg-white p-5 md:p-7 rounded-[1.5rem] md:rounded-[2.5rem] border shadow-sm">
-                            <h4 class="text-[9px] md:text-[10px] font-black text-slate-400 uppercase mb-3">Active Month Leaves</h4>
-                            <div id="configLeaveList" class="max-h-[220px] overflow-y-auto pr-2 space-y-2"></div>
-                        </div>
                     </div>
                 </div>
 
-                <!-- SECTION 2: BULK MONTHLY REPORT GENERATOR -->
-                <div id="reportSection" class="hidden animate-in fade-in duration-300">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">Select Target Month</h3>
-                        <div class="flex gap-3 mb-6">
-                            <select id="repYear" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm flex-1 font-bold outline-none cursor-pointer focus:border-green-400"><option>2026</option></select>
-                            <select id="repMonth" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm flex-1 font-bold outline-none cursor-pointer focus:border-green-400">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                            </select>
-                        </div>
-                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-3 tracking-wider">Check Employees to include</h3>
-                        <div id="userCheckboxContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[300px] md:max-h-[400px] overflow-y-auto mb-6 p-3 border-2 border-dashed border-slate-200 rounded-[1.5rem] bg-slate-50/50">
-                            <!-- Checkboxes inject dynamically -->
-                        </div>
-                        <button onclick="generateMonthlySummaryReport()" class="w-full bg-green-500 hover:bg-green-600 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Generate Summary Report</button>
-                    </div>
+                <div id="chartMetricWrap" class="mb-3">
+                    <select id="chartMetric" class="w-full bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none text-slate-700">
+                        <option value="normal">Normal OT (Hours)</option>
+                        <option value="special">Special OT (Hours)</option>
+                        <option value="lieu">Lieu Days</option>
+                        <option value="nopay">No-Pay Days</option>
+                    </select>
                 </div>
 
-                <!-- SECTION 5: MANUAL NO-PAY MANAGEMENT TAB -->
-                <div id="noPaySection" class="hidden animate-in fade-in duration-300 space-y-4">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h3 class="text-[10px] md:text-xs font-black text-red-500 uppercase mb-4 tracking-wider">Manual No-Pay Entry Form</h3>
-                        
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <select id="noPayYearSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400"><option>2026</option></select>
-                            <select id="noPayMonthSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border border-slate-200 p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400">
-                                <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
-                                <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
-                                <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
-                                <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
-                            </select>
-                        </div>
-
-                        <select id="noPayUserSelect" onchange="loadSelectedUserNoPay();" class="w-full bg-red-50 hover:bg-red-100 transition-colors text-red-700 border-2 border-red-200 p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-black outline-none cursor-pointer focus:border-red-400 mb-4">
-                            <!-- Dropdown dynamically loads -->
-                        </select>
-
-                        <div class="md:grid md:grid-cols-2 md:gap-4 mb-5">
-                            <div class="mb-3 md:mb-0">
-                                <label class="block text-[8px] md:text-[10px] font-black text-slate-400 uppercase mb-1.5">Select Date</label>
-                                <input type="date" id="noPayDateInput" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none focus:border-red-400 transition-colors">
-                            </div>
-                            <div>
-                                <label class="block text-[8px] md:text-[10px] font-black text-slate-400 uppercase mb-1.5">No-Pay Type/Value</label>
-                                <select id="noPayAmountSelect" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold outline-none cursor-pointer focus:border-red-400 transition-colors">
-                                    <option value="1.0">FULL DAY (1.0)</option>
-                                    <option value="0.5">HALF DAY (0.5)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <button onclick="saveManualNoPay()" class="w-full bg-red-600 hover:bg-red-700 transition-colors text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Save No-Pay Record</button>
-                    </div>
-
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                        <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4">Recorded No-Pay Log for Selected Month</h3>
-                        <div id="noPayListContainer" class="md:grid md:grid-cols-2 md:gap-3 max-h-[300px] overflow-y-auto pr-2 space-y-2 md:space-y-0">
-                            <!-- Dynamic List Injects here -->
-                        </div>
-                    </div>
+                <button onclick="loadAnalyticsData()" class="w-full bg-blue-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm mb-4">Generate Chart</button>
+                
+                <!-- Chart Container -->
+                <div class="relative w-full h-[280px] border rounded-2xl bg-slate-50 p-2 flex items-center justify-center">
+                    <div id="chartMessage" class="text-slate-400 text-[10px] font-bold uppercase">Select Options & Generate</div>
+                    <canvas id="otChart" class="hidden"></canvas>
                 </div>
-
-                <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
-                <div id="employeeSection" class="hidden animate-in fade-in duration-300 space-y-4">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/30 to-white">
-                        <h3 class="text-[10px] md:text-xs font-black text-purple-600 uppercase mb-4 tracking-wider">Head of the Department Profile</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4">
-                            <input type="text" id="hodName" placeholder="FULL NAME (E.G., A.B.C. PERERA)" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-purple-400 transition-colors">
-                            <input type="text" id="hodPosition" placeholder="POSITION (E.G., QUALITY ASSURANCE MANAGER)" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-purple-400 transition-colors">
-                        </div>
-                        <button onclick="saveHODDetails()" class="w-full bg-purple-600 hover:bg-purple-700 transition-colors text-white py-4 md:py-5 rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Update HOD Profile</button>
-                    </div>
-
-                    <div class="md:grid md:grid-cols-12 md:gap-4">
-                        <div class="md:col-span-5 bg-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm mb-4 md:mb-0 h-fit">
-                            <h3 id="formTitle" class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider">Add New Employee</h3>
-                            <div class="space-y-3 md:space-y-4 mb-5">
-                                <input type="text" id="empEpf" placeholder="EPF NUMBER" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-blue-400 transition-colors">
-                                <input type="text" id="empName" placeholder="FULL NAME" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none font-bold uppercase focus:border-blue-400 transition-colors">
-                                <input type="email" id="empEmail" placeholder="REGISTERED GOOGLE EMAIL" class="w-full p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none text-slate-600 focus:border-blue-400 transition-colors">
-                            </div>
-                            <div class="flex flex-col gap-2">
-                                <button id="saveBtn" onclick="saveEmployeeDetails()" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm uppercase shadow-lg tracking-widest">Save Employee profile</button>
-                                <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-full bg-slate-200 hover:bg-slate-300 transition-colors text-slate-600 py-3 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm uppercase tracking-wider mt-1">Cancel Edit</button>
-                            </div>
-                        </div>
-                        
-                        <div class="md:col-span-7 bg-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm h-full max-h-[500px] flex flex-col">
-                            <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase mb-4 tracking-wider flex-shrink-0">System Registered Employees</h3>
-                            <div id="employeeListContainer" class="space-y-2 md:space-y-3 overflow-y-auto pr-2 flex-1">
-                                <!-- List items inject dynamically with Edit and Delete controls -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION 4: LOGIN LOGS HISTORY -->
-                <div id="logSection" class="hidden animate-in fade-in duration-300">
-                    <div class="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border shadow-sm">
-                        <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                            <h3 class="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider">Recent System Login Logs</h3>
-                            <button onclick="loadLoginLogs()" class="text-blue-600 hover:bg-blue-100 transition-colors text-[9px] md:text-[10px] font-black uppercase bg-blue-50 px-3 py-1.5 md:py-2 rounded-lg border border-blue-200 shadow-sm">Refresh List</button>
-                        </div>
-                        <div id="logListContainer" class="max-h-[500px] overflow-y-auto pr-2 space-y-2 md:space-y-3">
-                            <!-- Log entries inject dynamically -->
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
+
+        <!-- SECTION 1: TIMESHEETS DISPLAY & EDIT -->
+        <div id="timesheetSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">View & Edit Attendance Sheet</h3>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="yearSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="monthSelect" onchange="loadSelectedUserSheet();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+                <select id="adminUserSelect" onchange="loadSelectedUserSheet();" class="w-full bg-blue-50 text-blue-700 border-2 border-blue-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
+                    <!-- Dropdown dynamically loads -->
+                </select>
+                <div id="totalHrs" class="text-slate-400 text-center text-[10px] font-bold uppercase py-2">Select an employee to run summary analysis.</div>
+            </div>
+            <div id="sheetContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm min-h-[150px]"></div>
+        </div>
+
+        <!-- SECTION: WEEKLY TIME CHECK -->
+        <div id="weeklySection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-indigo-600 uppercase mb-3">Weekly Time Check Calculator</h3>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="weeklyYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="weeklyMonth" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+                <select id="weeklyUserSelect" class="w-full bg-indigo-50 text-indigo-700 border-2 border-indigo-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
+                    <!-- Dropdown dynamically loads -->
+                </select>
+                <button onclick="runWeeklyCheck()" class="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-md">Calculate Weekly Time</button>
+            </div>
+            <div id="weeklyResultContainer" class="space-y-1"></div>
+        </div>
+
+        <!-- SECTION 6: AUTOMATED AUDITOR TAB -->
+        <div id="auditSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-emerald-600 uppercase mb-2">Automated Sheet Auditor (Rules Checker)</h3>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="auditYear" onchange="clearAuditView();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="auditMonth" onchange="clearAuditView();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+                <select id="auditUserSelect" onchange="clearAuditView();" class="w-full bg-emerald-50 text-emerald-700 border-2 border-emerald-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
+                    <!-- Dynamic Loading Dropdown -->
+                </select>
+                <button onclick="runAuditCheck()" class="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-md">Check Sheet Rules</button>
+            </div>
+            <div id="auditResultContainer" class="bg-white rounded-[1.5rem] border overflow-hidden shadow-sm max-h-[350px] overflow-y-auto"></div>
+        </div>
+
+        <!-- SECTION 7: LEAVES & HOLIDAYS MANAGEMENT TAB -->
+        <div id="configSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3">Manage Leaves & Holidays For Employees</h3>
+                
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="configYearSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="configMonthSelect" onchange="loadSelectedUserConfig();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+
+                <select id="configUserSelect" onchange="loadSelectedUserConfig();" class="w-full bg-purple-50 text-purple-700 border-2 border-purple-200 p-3 rounded-xl text-xs font-black outline-none mb-4">
+                    <!-- Dropdown -->
+                </select>
+
+                <!-- Holiday Form Split -->
+                <div class="border-t pt-3 mb-4">
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Add Custom Holiday</label>
+                    <div class="flex gap-2">
+                        <input type="date" id="configHolidayInput" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none flex-1">
+                        <button onclick="adminAddHoliday()" class="bg-purple-600 text-white px-4 rounded-xl font-black text-xs uppercase shadow-sm">Add</button>
+                    </div>
+                </div>
+
+                <!-- Leave Form Split -->
+                <div class="border-t pt-3">
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Record Approved Employee Leave</label>
+                    <input type="date" id="configLeaveDate" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none mb-2">
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <select id="configLeaveType" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                            <option>Full Leave</option><option>Half Day</option><option>Short Leave</option><option>Lieu Leave</option>
+                        </select>
+                        <select id="configLeaveSlot" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                            <option>Full Day</option><option>Morning</option><option>Evening</option>
+                        </select>
+                    </div>
+                    <button onclick="adminSaveLeave()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm">Save/Update Leave</button>
+                </div>
+            </div>
+
+            <!-- Two Columns for Display Logs -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="bg-white p-4 rounded-[1.5rem] border shadow-sm">
+                    <h4 class="text-[9px] font-black text-slate-400 uppercase mb-2">Active Holidays</h4>
+                    <div id="configHolidayList" class="max-h-[180px] overflow-y-auto pr-1"></div>
+                </div>
+                <div class="bg-white p-4 rounded-[1.5rem] border shadow-sm">
+                    <h4 class="text-[9px] font-black text-slate-400 uppercase mb-2">Active Month Leaves</h4>
+                    <div id="configLeaveList" class="max-h-[180px] overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: BULK MONTHLY REPORT GENERATOR -->
+        <div id="reportSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase mb-3">Select Target Month</h3>
+                <div class="flex gap-2 mb-3">
+                    <select id="repYear" class="bg-slate-50 border p-2.5 rounded-xl text-xs flex-1 font-bold outline-none"><option>2026</option></select>
+                    <select id="repMonth" class="bg-slate-50 border p-2.5 rounded-xl text-xs flex-1 font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+                <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">Check Employees to include</h3>
+                <div id="userCheckboxContainer" class="grid grid-cols-1 gap-1.5 max-h-[220px] overflow-y-auto mb-4 p-1 border border-dashed rounded-xl">
+                    <!-- Checkboxes inject dynamically -->
+                </div>
+                <button onclick="generateMonthlySummaryReport()" class="w-full bg-green-500 text-white py-3.5 rounded-xl font-black text-xs uppercase shadow-md">Generate Summary Report</button>
+            </div>
+        </div>
+
+        <!-- SECTION 5: MANUAL NO-PAY MANAGEMENT TAB -->
+        <div id="noPaySection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-red-500 uppercase mb-3">Manual No-Pay Entry Form</h3>
+                
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select id="noPayYearSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none"><option>2026</option></select>
+                    <select id="noPayMonthSelect" onchange="loadSelectedUserNoPay();" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold outline-none">
+                        <option value="0">JANUARY</option><option value="1">FEBRUARY</option><option value="2">MARCH</option>
+                        <option value="3" selected>APRIL</option><option value="4">MAY</option><option value="5">JUNE</option>
+                        <option value="6">JULY</option><option value="7">AUGUST</option><option value="8">SEPTEMBER</option>
+                        <option value="9">OCTOBER</option><option value="10">NOVEMBER</option><option value="11">DECEMBER</option>
+                    </select>
+                </div>
+
+                <select id="noPayUserSelect" onchange="loadSelectedUserNoPay();" class="w-full bg-red-50 text-red-700 border-2 border-red-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
+                    <!-- Dropdown dynamically loads -->
+                </select>
+
+                <div class="grid grid-cols-2 gap-2 mb-3.5">
+                    <div>
+                        <label class="block text-[8px] font-black text-slate-400 uppercase mb-1">Select Date</label>
+                        <input type="date" id="noPayDateInput" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[8px] font-black text-slate-400 uppercase mb-1">No-Pay Type/Value</label>
+                        <select id="noPayAmountSelect" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                            <option value="1.0">FULL DAY (1.0)</option>
+                            <option value="0.5">HALF DAY (0.5)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="saveManualNoPay()" class="w-full bg-red-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm">Save No-Pay Record</button>
+            </div>
+
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">Recorded No-Pay Log for Selected Month</h3>
+                <div id="noPayListContainer" class="max-h-[200px] overflow-y-auto">
+                    <!-- Dynamic List Injects here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: EMPLOYEE MANAGEMENT CONTROL -->
+        <div id="employeeSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border-2 border-purple-100 shadow-sm bg-gradient-to-b from-purple-50/20 to-white">
+                <h3 class="text-[10px] font-black text-purple-600 uppercase mb-3 tracking-wide">Head of the Department Profile</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-3">
+                    <input type="text" id="hodName" placeholder="FULL NAME (E.G., A.B.C. PERERA)" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                    <input type="text" id="hodPosition" placeholder="POSITION (E.G., QUALITY ASSURANCE MANAGER)" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                </div>
+                <button onclick="saveHODDetails()" class="w-full bg-purple-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm hover:bg-purple-700 transition-all">Update HOD Profile</button>
+            </div>
+
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 id="formTitle" class="text-[10px] font-black text-slate-400 uppercase mb-3">Add New Employee</h3>
+                <div class="space-y-2.5 mb-3">
+                    <input type="text" id="empEpf" placeholder="EPF NUMBER" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                    <input type="text" id="empName" placeholder="FULL NAME" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
+                    <input type="email" id="empEmail" placeholder="REGISTERED GOOGLE EMAIL" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none text-slate-600">
+                </div>
+                <div class="flex gap-1.5">
+                    <button id="saveBtn" onclick="saveEmployeeDetails()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm">Save Employee profile</button>
+                    <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden bg-slate-200 text-slate-600 py-3 px-4 rounded-xl font-bold text-xs uppercase">Cancel</button>
+                </div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase mb-2">System Registered Employees</h3>
+                <div id="employeeListContainer" class="space-y-1.5 max-h-[200px] overflow-y-auto">
+                    <!-- List items inject dynamically with Edit and Delete controls -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: LOGIN LOGS HISTORY -->
+        <div id="logSection" class="hidden space-y-3">
+            <div class="bg-white p-4 rounded-[2rem] border shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase">Recent System Login Logs</h3>
+                    <button onclick="loadLoginLogs()" class="text-blue-600 text-[9px] font-black uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100">Refresh</button>
+                </div>
+                <div id="logListContainer" class="max-h-[450px] overflow-y-auto pr-1">
+                    <!-- Log entries inject dynamically -->
+                </div>
+            </div>
+        </div>
+
     </div>
 </body>
 </html>
