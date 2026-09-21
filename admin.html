@@ -6,12 +6,13 @@
     <title>Admin Dashboard | CIC OT System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module">
         import { db, auth } from './firebase-config.js';
         import { initAuth, logout } from './auth.js';
-        // 1. මෙතනට cleanTime එකතු කළා
+        // මෙතන cleanTime එකතු කරලා තියෙනවා
         import { calculateRow, cleanTime } from './calculator.js';
         import { generateAdminPDF } from './admin-report.js';
         import { generatePDF } from './report.js'; 
@@ -339,44 +340,50 @@
             renderAdminSheet();
         };
 
-        // --- අලුත් Admin Excel Import Function එක ---
+        // --- Error අල්ලගන්න හදපු අලුත් Import Function එක ---
         window.adminImportExcel = () => {
             if(!activeTimesheetUid) return alert("Please select an employee first!");
             const f = document.createElement('input'); f.type = 'file'; f.accept = '.xlsx, .xls';
             f.onchange = (e) => {
                 const r = new FileReader();
                 r.onload = async (ev) => {
-                    const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
-                    const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { range: 11, defval: "", raw: false });
-                    const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
-                    let data = {};
-                    json.forEach(row => {
-                        let dK = Object.keys(row).find(k => k.trim().toLowerCase() === "date");
-                        let iK = Object.keys(row).find(k => k.trim().toLowerCase() === "check in");
-                        let oK = Object.keys(row).find(k => k.trim().toLowerCase() === "check out");
-                        let odK = Object.keys(row).find(k => k.trim().toLowerCase() === "out date");
-                        if(row[dK]) {
-                            let ds = String(row[dK]).trim(), p = ds.split(/[-/ ]/), day = p.length >= 3 ? (p[0].length === 4 ? parseInt(p[2]) : parseInt(p[0])) : parseInt(ds);
-                            if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds), workType: "" };
-                        }
-                    });
-                    document.getElementById('loadingOverlay').classList.remove('hidden');
-                    await setDoc(doc(db, "users", activeTimesheetUid, "months", mId), data, { merge: true });
-                    document.getElementById('loadingOverlay').classList.add('hidden');
-                    alert("Data Imported Successfully!"); 
-                    loadSelectedUserSheet();
+                    try {
+                        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
+                        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { range: 11, defval: "", raw: false });
+                        const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
+                        let data = {};
+                        json.forEach(row => {
+                            let dK = Object.keys(row).find(k => k.trim().toLowerCase() === "date");
+                            let iK = Object.keys(row).find(k => k.trim().toLowerCase() === "check in");
+                            let oK = Object.keys(row).find(k => k.trim().toLowerCase() === "check out");
+                            let odK = Object.keys(row).find(k => k.trim().toLowerCase() === "out date");
+                            if(row[dK]) {
+                                let ds = String(row[dK]).trim(), p = ds.split(/[-/ ]/), day = p.length >= 3 ? (p[0].length === 4 ? parseInt(p[2]) : parseInt(p[0])) : parseInt(ds);
+                                if(day) data[String(day)] = { in: cleanTime(row[iK]), out: cleanTime(row[oK]), isNextDay: (row[odK] && String(row[odK]).trim() !== ds), workType: "" };
+                            }
+                        });
+                        document.getElementById('loadingOverlay').classList.remove('hidden');
+                        await setDoc(doc(db, "users", activeTimesheetUid, "months", mId), data, { merge: true });
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                        
+                        alert("Data Imported Successfully!"); 
+                        window.loadSelectedUserSheet(); 
+
+                    } catch (error) {
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                        alert("Import Error එකක් ආවා: " + error.message);
+                    }
                 };
                 r.readAsArrayBuffer(e.target.files[0]);
             }; f.click();
         };
 
-        // --- අලුත් Admin Clear Month Function එක ---
         window.adminClearMonthData = async () => {
             if(!activeTimesheetUid) return alert("Please select an employee first!");
             if(!confirm("Are you sure you want to clear this month's data for this employee?")) return;
             const mId = `${document.getElementById('yearSelect').value}-${parseInt(document.getElementById('monthSelect').value) + 1}`;
             await deleteDoc(doc(db, "users", activeTimesheetUid, "months", mId));
-            loadSelectedUserSheet();
+            window.loadSelectedUserSheet();
         };
 
         async function renderAdminSheet() {
@@ -1140,8 +1147,7 @@
                 <select id="adminUserSelect" onchange="loadSelectedUserSheet();" class="w-full bg-blue-50 text-blue-700 border-2 border-blue-200 p-3 rounded-xl text-xs font-black outline-none mb-3">
                     <!-- Dropdown dynamically loads -->
                 </select>
-                
-                <!-- 3. මෙතන තමයි Admin Excel Import Buttons තියෙන්නේ -->
+
                 <div class="flex gap-2 mb-2">
                     <button onclick="adminImportExcel()" class="flex-1 bg-white border border-blue-200 text-blue-600 text-[9px] py-2.5 rounded-xl font-black uppercase tracking-wider shadow-sm">Import Excel</button>
                     <button onclick="adminClearMonthData()" class="flex-1 bg-white border border-red-200 text-red-500 text-[9px] py-2.5 rounded-xl font-black uppercase tracking-wider shadow-sm">Clear Month</button>
