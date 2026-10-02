@@ -12,7 +12,6 @@
     <script type="module">
         import { db, auth } from './firebase-config.js';
         import { initAuth, logout } from './auth.js';
-        // මෙතන cleanTime එකතු කරලා තියෙනවා
         import { calculateRow, cleanTime } from './calculator.js';
         import { generateAdminPDF } from './admin-report.js';
         import { generatePDF } from './report.js'; 
@@ -55,7 +54,8 @@
             usersSnap.forEach(doc => {
                 const d = doc.data();
                 if(!d.isAdmin) {
-                    allUsers.push({ id: doc.id, email: d.email, epf: d.epf || "-", name: d.name || d.email.split('@')[0] });
+                    // allowOver24 අගය Database එකෙන් ගන්නවා
+                    allUsers.push({ id: doc.id, email: d.email, epf: d.epf || "-", name: d.name || d.email.split('@')[0], allowOver24: d.allowOver24 || false });
                 }
             });
             
@@ -110,6 +110,10 @@
             const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
             const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
+            // සේවකයාගේ allowOver24 setting එක ගන්නවා
+            const empObj = allUsers.find(u => u.id === uid);
+            const acceptOver24 = empObj ? empObj.allowOver24 : false;
+
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
             let takenLieuDays = 0; 
             let lastDayWasFullShift = false;
@@ -137,7 +141,7 @@
                     }
                 }
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff, acceptOver24);
                 lastDayWasFullShift = res.isFullDay;
 
                 if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; 
@@ -340,7 +344,6 @@
             renderAdminSheet();
         };
 
-        // --- Error අල්ලගන්න හදපු අලුත් Import Function එක ---
         window.adminImportExcel = () => {
             if(!activeTimesheetUid) return alert("Please select an employee first!");
             const f = document.createElement('input'); f.type = 'file'; f.accept = '.xlsx, .xls';
@@ -398,6 +401,10 @@
             const docSnap = await getDoc(doc(db, "users", activeTimesheetUid, "months", monthId));    
             const savedData = docSnap.exists() ? docSnap.data() : {};    
 
+            // සේවකයාගේ allowOver24 setting එක ගන්නවා
+            const empObj = allUsers.find(u => u.id === activeTimesheetUid);
+            const acceptOver24 = empObj ? empObj.allowOver24 : false;
+
             container.innerHTML = "";    
             currentMonthRows = [];
             let tNormalHrs = 0, tSpecialOT = 0, tLieuDays = 0, deductionDays = 0;
@@ -428,7 +435,7 @@
                     }
                 }
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff, acceptOver24);
                 if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++; 
                 lastDayWasFullShift = res.isFullDay;
 
@@ -551,6 +558,9 @@
             const levSnap = await getDoc(doc(db, "users", uid, "leaves", monthId));
             const userLeaves = levSnap.exists() ? levSnap.data() : {};
 
+            const empObj = allUsers.find(u => u.id === uid);
+            const acceptOver24 = empObj ? empObj.allowOver24 : false;
+
             let weeks = [];
             let currentWeek = [];
             for (let d = 1; d <= daysInMonth; d++) {
@@ -588,7 +598,7 @@
                     }
                 }
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff, acceptOver24);
                 lastDayWasFullShift = res.isFullDay;
 
                 let normalWorked = 0;
@@ -685,11 +695,12 @@
             const epf = document.getElementById('empEpf').value.trim();
             const name = document.getElementById('empName').value.trim();
             const email = document.getElementById('empEmail').value.trim().toLowerCase();
+            const allowOver24 = document.getElementById('empAllowOver24').checked; // අලුත් Checkbox එක
 
             if(!epf || !name || !email) return alert("Please fill all fields!");
 
             if (selectedUserId) {
-                await updateDoc(doc(db, "users", selectedUserId), { epf: epf, name: name, email: email });
+                await updateDoc(doc(db, "users", selectedUserId), { epf: epf, name: name, email: email, allowOver24: allowOver24 });
                 alert("Employee profile updated successfully!");
                 cancelEdit();
             } else {
@@ -699,11 +710,11 @@
                 snap.forEach(dDoc => { if(dDoc.data().email && dDoc.data().email.toLowerCase() === email) foundUid = dDoc.id; });
 
                 if(foundUid) {
-                    await setDoc(doc(db, "users", foundUid), { epf: epf, name: name }, { merge: true });
+                    await setDoc(doc(db, "users", foundUid), { epf: epf, name: name, allowOver24: allowOver24 }, { merge: true });
                     alert("Employee connected to registered user!");
                 } else {
                     const pseudoUid = email.replace(/[^a-zA-Z0-9]/g, "_");
-                    await setDoc(doc(db, "users", pseudoUid), { email: email, epf: epf, name: name, isAdmin: false }, { merge: true });
+                    await setDoc(doc(db, "users", pseudoUid), { email: email, epf: epf, name: name, isAdmin: false, allowOver24: allowOver24 }, { merge: true });
                     alert("Profile pre-mapped.");
                 }
             }
@@ -711,11 +722,12 @@
             await loadAdminData();
         };
 
-        window.editEmployee = (id, epf, name, email) => {
+        window.editEmployee = (id, epf, name, email, allowOver24) => {
             selectedUserId = id;
             document.getElementById('empEpf').value = epf === '-' ? '' : epf;
             document.getElementById('empName').value = name;
             document.getElementById('empEmail').value = email;
+            document.getElementById('empAllowOver24').checked = allowOver24;
             document.getElementById('formTitle').innerText = "Change Employee Details";
             document.getElementById('saveBtn').innerText = "Update Profile";
             document.getElementById('cancelEditBtn').classList.remove('hidden');
@@ -745,6 +757,7 @@
             document.getElementById('empEpf').value = "";
             document.getElementById('empName').value = "";
             document.getElementById('empEmail').value = "";
+            document.getElementById('empAllowOver24').checked = false;
         }
 
         function renderEmployeeList() {
@@ -753,10 +766,11 @@
                 <div class="flex justify-between items-center p-2.5 bg-white border rounded-xl text-xs font-bold mb-1.5 shadow-sm">
                     <div>
                         <span class="text-blue-600 font-black">[EPF: ${u.epf}]</span> ${u.name.toUpperCase()}
+                        ${u.allowOver24 ? `<span class="bg-blue-100 text-blue-700 text-[8px] px-1.5 py-0.5 rounded font-black ml-1 border border-blue-200">24H+</span>` : ''}
                         <p class="text-[10px] text-slate-400 font-normal text-slate-500">${u.email}</p>
                     </div>
                     <div class="flex gap-1">
-                        <button onclick="editEmployee('${u.id}', '${u.epf}', '${u.name}', '${u.email}')" class="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-100">Edit</button>
+                        <button onclick="editEmployee('${u.id}', '${u.epf}', '${u.name}', '${u.email}', ${u.allowOver24})" class="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-100">Edit</button>
                         <button onclick="deleteEmployee('${u.id}', '${u.name}')" class="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-red-100">Delete</button>
                     </div>
                 </div>
@@ -1339,6 +1353,12 @@
                     <input type="text" id="empEpf" placeholder="EPF NUMBER" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
                     <input type="text" id="empName" placeholder="FULL NAME" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none font-bold uppercase">
                     <input type="email" id="empEmail" placeholder="REGISTERED GOOGLE EMAIL" class="w-full p-3 bg-slate-50 border rounded-xl text-xs outline-none text-slate-600">
+                    
+                    <!-- [අලුත් කොටස]: පැය 24 Control Checkbox එක -->
+                    <label class="flex items-center gap-2.5 p-3 bg-slate-50 border rounded-xl cursor-pointer mt-1">
+                        <input type="checkbox" id="empAllowOver24" class="w-4 h-4 text-blue-600">
+                        <span class="text-xs font-bold text-slate-600 uppercase">Allow >24 Hours Per Shift</span>
+                    </label>
                 </div>
                 <div class="flex gap-1.5">
                     <button id="saveBtn" onclick="saveEmployeeDetails()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-sm">Save Employee profile</button>
