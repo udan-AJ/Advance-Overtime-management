@@ -19,13 +19,18 @@
         let userLeaves = {};
         let currentCalcData = {};
         let currentMonthRows = [];
+        let currentUserAllowOver24 = false; // සේවකයාගේ allowOver24 තත්ත්වය තියාගන්න
 
         initAuth(
             async (user) => {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists() && userDoc.data().isAdmin) {
-                    window.location.href = "admin.html";
-                    return; 
+                if (userDoc.exists()) {
+                    if (userDoc.data().isAdmin) {
+                        window.location.href = "admin.html";
+                        return; 
+                    }
+                    // Database එකෙන් allowOver24 අගය ගන්නවා
+                    currentUserAllowOver24 = userDoc.data().allowOver24 === true;
                 }
 
                 document.getElementById('authScreen').classList.add('hidden');
@@ -115,7 +120,7 @@
                     }
                 }
 
-                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff);
+                const res = calculateRow(dayData.in, dayData.out, isHoliday, dayOfWeek, dayData.isNextDay, lastDayWasFullShift, leaveData, isNextDayOff, currentUserAllowOver24);
                 if ((dayOfWeek === 0 || isHoliday) && res.worked >= 9) tLieuDays++;
                 lastDayWasFullShift = res.isFullDay;
 
@@ -195,7 +200,7 @@
             }    
 
             let earnedLieuDays = tLieuDays;
-            tLieuDays = tLieuDays - takenLieuDays;
+            tLieuDays = tLieuDays - takenLieuDays; 
 
             const tShouldWork = (daysInMonth - deductionDays) * 9;
             const tNormalOT = Math.max(0, tNormalHrs - tShouldWork);
@@ -209,7 +214,7 @@
                     <div class="flex justify-between text-orange-300"><span>Special OT:</span> <span class="font-bold">${tSpecialOT.toFixed(1)}</span></div>
                     <div class="flex justify-between text-blue-300 border-t border-white/20 pt-1 mt-1">
                         <span>Lieu Days (Bal):</span> 
-                        <span class="font-bold">${tLieuDays} ${takenLieuDays > 0 ? `<span class="text-[7px] text-blue-200 font-normal">(${earnedLieuDays} - ${takenLieuDays})</span>` : ''}</span>
+                        <span class="font-bold">${tLieuDays} ${takenLieuDays > 0 ? `<span class="text-[7px] text-blue-200 font-normal">(${earnedLieuDays} -${takenLieuDays})</span>` : ''}</span>
                     </div>
                 </div>
                 <div class="flex gap-2">
