@@ -4,7 +4,8 @@ export function cleanTime(val) {
     return m ? `${m[1].padStart(2,'0')}:${m[2].padStart(2,'0')}` : "00:00";
 }
 
-export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isNextDayOff) {
+// අගට acceptOver24 කියලා අලුත් parameter එකක් එකතු කළා
+export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isNextDayOff, acceptOver24 = false) {
     const hasData = (inTime && outTime && inTime !== "00:00" && outTime !== "00:00");
     
     if (!hasData) {
@@ -36,6 +37,11 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
     let mWork = finalMinutes % 60;
     let roundedWorked = hWork + (mWork >= 25 && mWork <= 54 ? 0.5 : (mWork >= 55 ? 1.0 : 0));
 
+    // [පැය 24 සීමා කිරීමේ ලොජික් එක] - Admin Accept කරලා නැත්නම් විතරක් 24ට කපනවා
+    if (roundedWorked > 24 && !acceptOver24) {
+        roundedWorked = 24.0;
+    }
+
     let isFullDay = roundedWorked >= 15; 
     
     let req = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
@@ -47,7 +53,6 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
             req = Math.max(0, req - 4.5);
         }
     } else if (isFullDay && req > 0) {
-        // ඊළඟ දවස නිවාඩු නම් (Leave/Holiday/Weekend) Req එක 9ක් පමණි!
         req = isNextDayOff ? 9 : 18; 
     }
 
