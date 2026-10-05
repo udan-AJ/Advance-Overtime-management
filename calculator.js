@@ -4,16 +4,16 @@ export function cleanTime(val) {
     return m ? `${m[1].padStart(2,'0')}:${m[2].padStart(2,'0')}` : "00:00";
 }
 
-// අගට acceptOver24 කියලා අලුත් parameter එකක් එකතු කළා
 export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, wasFullDayShift, leaveData, isNextDayOff, acceptOver24 = false) {
     const hasData = (inTime && outTime && inTime !== "00:00" && outTime !== "00:00");
     
+    // දත්ත නොමැති දින සඳහා
     if (!hasData) {
         let baseReq = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
         
         if (leaveData) {
             if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") baseReq = 0;
-            else if (leaveData.type === "Half Day") baseReq = 4.5;
+            else if (leaveData.type === "Half Day") baseReq = Math.max(0, baseReq - 4.5);
         }
         return { worked: 0, req: baseReq, ot: 0, sOT: 0, isFullDay: false };
     }
@@ -37,7 +37,6 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
     let mWork = finalMinutes % 60;
     let roundedWorked = hWork + (mWork >= 25 && mWork <= 54 ? 0.5 : (mWork >= 55 ? 1.0 : 0));
 
-    // [පැය 24 සීමා කිරීමේ ලොජික් එක] - Admin Accept කරලා නැත්නම් විතරක් 24ට කපනවා
     if (roundedWorked > 24 && !acceptOver24) {
         roundedWorked = 24.0;
     }
@@ -46,14 +45,20 @@ export function calculateRow(inTime, outTime, isHoliday, dayOfWeek, isNextDay, w
     
     let req = (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday || wasFullDayShift) ? 0 : 9;
 
+    // 1. මුලින්ම Day/Night Shift එකක්ද කියලා බලලා Base Req එක 18ක් (හෝ 9ක්) කරනවා
+    if (isFullDay && req > 0) {
+        req = isNextDayOff ? 9 : 18; 
+    }
+
+    // 2. ඊටපස්සේ තමයි ඒ හැදුණු Base Req එකෙන් Leave අගයන් අඩු කරන්නේ
     if (leaveData) {
         if (leaveData.type === "Full Leave" || leaveData.type === "Lieu Leave") {
-            req = isFullDay ? 9 : 0; 
+            // Full Day එකක් නම් පැය 9ක් අඩු වෙනවා (18 තිබ්බොත් 9 වෙනවා, 9 තිබ්බොත් 0 වෙනවා)
+            req = Math.max(0, req - 9); 
         } else if (leaveData.type === "Half Day") {
+            // Half Day එකක් නම් පැය 4.5ක් අඩු වෙනවා (18 තිබ්බොත් 13.5 වෙනවා)
             req = Math.max(0, req - 4.5);
         }
-    } else if (isFullDay && req > 0) {
-        req = isNextDayOff ? 9 : 18; 
     }
 
     let ot = (dayOfWeek === 0 || isHoliday) ? 0 : Math.max(0, roundedWorked - req);
